@@ -16,6 +16,7 @@
 //             object-to-world rows
 //   uBvh    RGBA32F, 2048 wide, 2 texels per node; uTri RGBA32F, 2048 wide, 6 texels per triangle
 //   uTargets RGBA32F, one bounding sphere per row: the specular objects photons are aimed at
+// uLam is read by the app, not by the shaders: it becomes the per-sweep wavelengths uLamK.
 
 export const COMMON = /* glsl */ `
 precision highp float;
@@ -28,7 +29,6 @@ const float EPS = 2.0e-5;
 const float LAM0 = 380.0;
 const float LAM1 = 750.0;
 const int NS = 1024;
-const int NL = 2048;
 
 const int T_SPHERE = 0;
 const int T_BOX = 1;
@@ -52,7 +52,6 @@ uniform sampler2D uObj;
 uniform sampler2D uMat;
 uniform sampler2D uPlanes;
 uniform sampler2D uSpec;
-uniform sampler2D uLam;
 uniform sampler2D uLights;
 uniform sampler2D uBvh;
 uniform sampler2D uTri;
@@ -96,14 +95,22 @@ float spec(int row) {
 // Rows 0..2 of uSpec are the CIE 1931 colour matching functions.
 vec3 cmf() { return vec3(spec(0), spec(1), spec(2)); }
 
-// Draw a wavelength from the scene's emission-weighted distribution. Returns 1 / pdf.
-float sampleWavelength(float u) {
-  float x = clamp(u, 0.0, 0.999999) * float(NL);
-  int i = int(x);
-  float a = texelFetch(uLam, ivec2(i, 0), 0).r;
-  float b = texelFetch(uLam, ivec2(i + 1, 0), 0).r;
-  setWavelength(mix(a, b, x - float(i)));
-  return float(NL) * (b - a);
+// Each sweep of the image works with NK wavelengths, drawn by the app from the scene's
+// emission-weighted distribution (stratified, and shifted from sweep to sweep). Camera paths
+// pick one of them at random per pixel; photons take them in turn. Sharing the wavelengths is
+// what lets a camera path gather photons: both were traced through the same glass at the same
+// index. Returns 1 / pdf of the chosen wavelength.
+const int NK = 8;
+uniform float uLamK[NK];
+uniform float uInvPdfK[NK];
+float useWavelength(int k) {
+  setWavelength(uLamK[k]);
+  return uInvPdfK[k];
+}
+
+// Hash of a photon-map cell for wavelength slot k (the same in the builder and the gatherer).
+uint cellHash(ivec3 c, int k) {
+  return pcg(uint(c.x) + pcg(uint(c.y) + pcg(uint(c.z) + pcg(uint(k) + 0x51ED27u))));
 }
 
 // ---------------------------------------------------------------- small helpers

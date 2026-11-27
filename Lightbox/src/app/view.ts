@@ -56,6 +56,9 @@ export class View {
   /** The camera moved or its lens changed: restart the picture without repacking. */
   applyCamera(): void {
     if (!this.scene) return;
+    const cam = this.scene.camera;
+    // The photon gather starts at about half a percent of the subject distance and shrinks.
+    this.tracer.radius0 = 0.006 * Math.hypot(cam.pos[0] - cam.target[0], cam.pos[1] - cam.target[1], cam.pos[2] - cam.target[2]);
     this.tracer.setCamera(cameraFrame(this.scene.camera, this.tracer.width / Math.max(1, this.tracer.height)));
     this.metered = -1;
   }

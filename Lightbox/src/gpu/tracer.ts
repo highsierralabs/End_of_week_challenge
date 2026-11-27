@@ -7,7 +7,7 @@ import { NL, NS } from '../core/spectrum';
 import { type Vec3, cross, norm, sub } from '../core/vec';
 import { Program, createFramebuffer, createTexture, dataTexture } from './gl';
 import { DEVELOP_FRAG, DOWN_FRAG, METER_FRAG, PRINT_FRAG, UP_FRAG } from './shaders/display';
-import { ADD_FRAG, FULLSCREEN_VERT, LT_FRAG, PT_FRAG, SPLAT_FRAG, SPLAT_VERT } from './shaders/trace';
+import { ADD_FRAG, COUNT_FRAG, FULLSCREEN_VERT, HASH_FRAG, HASH_VERT, LT_FRAG, PT_FRAG, SPLAT_FRAG, SPLAT_VERT } from './shaders/trace';
 
 export interface Look {
   /** Row-major 3x3 from tracer XYZ to linear sRGB (includes the white balance). */
@@ -43,6 +43,10 @@ export function cameraFrame(cam: Camera, aspect: number): CameraFrame {
 }
 
 const BVH_W = 2048;
+/** Wavelengths per sweep (NK in the shaders). */
+const NK = 8;
+/** How fast the gather radius shrinks: r^2 falls as sweep^(ALPHA - 1). */
+const PM_ALPHA = 0.7;
 const METER_W = 32;
 const METER_H = 18;
 
@@ -62,7 +66,7 @@ export class Tracer {
   readonly gl: WebGL2RenderingContext;
   readonly floatBlend: boolean;
   private readonly parallel: KHR_parallel_shader_compile | null;
-  private readonly progs: Record<'pt' | 'lt' | 'splat' | 'add' | 'develop' | 'meter' | 'down' | 'up' | 'print', Program>;
+  private readonly progs: Record<'pt' | 'lt' | 'splat' | 'hash' | 'count' | 'add' | 'develop' | 'meter' | 'down' | 'up' | 'print', Program>;
   private readonly vao: WebGLVertexArrayObject;
 
   width = 0;
@@ -76,6 +80,10 @@ export class Tracer {
   tileSize = 256;
   photonSize = 256;
   useLT = true;
+  /** Gather photons for caustics seen through glass or in mirrors (needs the photon pass). */
+  usePM = true;
+  /** Gather radius of the first sweep, metres; it shrinks from sweep to sweep. */
+  radius0 = 0.01;
   vignette = false;
   clamp = 1e30;
 
@@ -85,16 +93,26 @@ export class Tracer {
   private scene: Packed | null = null;
   private cam: CameraFrame | null = null;
   private maxBounces = 12;
-  private readonly tex: Record<string, WebGLTexture | null> = { obj: null, mat: null, planes: null, spec: null, lam: null, lights: null, targets: null, bvh: null, tri: null };
+  private readonly tex: Record<string, WebGLTexture | null> = { obj: null, mat: null, planes: null, spec: null, lights: null, targets: null, bvh: null, tri: null };
   private accum: [WebGLTexture, WebGLTexture] | null = null;
   private accumFb: [WebGLFramebuffer, WebGLFramebuffer] | null = null;
   private lt: [WebGLTexture, WebGLTexture] | null = null;
   private ltFb: [WebGLFramebuffer, WebGLFramebuffer] | null = null;
   private splat16: WebGLTexture | null = null;
   private splat16Fb: WebGLFramebuffer | null = null;
-  private phot: [WebGLTexture, WebGLTexture] | null = null;
+  private phot: WebGLTexture[] | null = null;
   private photFb: WebGLFramebuffer | null = null;
   private photAlloc = 0;
+  private hashTex: [WebGLTexture, WebGLTexture, WebGLTexture] | null = null;
+  private hashFb: WebGLFramebuffer | null = null;
+  private countFb: WebGLFramebuffer | null = null;
+  private hashDepth: WebGLRenderbuffer | null = null;
+  private hashW = 0;
+  private radius2 = 1e-4;
+  private radiusFrame = -1;
+  private readonly lamK = new Float32Array(NK);
+  private readonly invPdfK = new Float32Array(NK);
+  private gridShift: [number, number, number] = [0, 0, 0];
   private hdr: WebGLTexture | null = null;
   private hdrFb: WebGLFramebuffer | null = null;
   private bloom: { tex: WebGLTexture; fb: WebGLFramebuffer; w: number; h: number }[] = [];
@@ -114,6 +132,8 @@ export class Tracer {
       pt: mk('path tracer', FULLSCREEN_VERT, PT_FRAG),
       lt: mk('light tracer', FULLSCREEN_VERT, LT_FRAG),
       splat: mk('splat', SPLAT_VERT, SPLAT_FRAG),
+      hash: mk('photon map', HASH_VERT, HASH_FRAG),
+      count: mk('photon count', HASH_VERT, COUNT_FRAG),
       add: mk('add', FULLSCREEN_VERT, ADD_FRAG),
       develop: mk('develop', FULLSCREEN_VERT, DEVELOP_FRAG),
       meter: mk('meter', FULLSCREEN_VERT, METER_FRAG),
@@ -155,12 +175,11 @@ export class Tracer {
 
   setScene(p: Packed, bounces: number): void {
     const gl = this.gl;
-    for (const k of ['obj', 'mat', 'planes', 'spec', 'lam', 'lights', 'targets'] as const) if (this.tex[k]) gl.deleteTexture(this.tex[k]);
+    for (const k of ['obj', 'mat', 'planes', 'spec', 'lights', 'targets'] as const) if (this.tex[k]) gl.deleteTexture(this.tex[k]);
     this.tex.obj = dataTexture(gl, p.obj, OBJ_W).tex;
     this.tex.mat = dataTexture(gl, p.mat, MAT_W).tex;
     this.tex.planes = dataTexture(gl, p.planes, PLANE_W).tex;
     this.tex.spec = createTexture(gl, 'r32f', NS, p.numSpec, p.spec);
-    this.tex.lam = createTexture(gl, 'r32f', NL + 1, 1, p.lam);
     this.tex.lights = dataTexture(gl, p.lights, LIGHT_W).tex;
     this.tex.targets = dataTexture(gl, p.targets, 1).tex;
     this.scene = p;
@@ -230,6 +249,7 @@ export class Tracer {
     this.frame = 0;
     this.photons = 0;
     this.cursor = 0;
+    this.radiusFrame = -1;
     this.rw = Math.max(4, Math.floor(this.width / this.scale));
     this.rh = Math.max(4, Math.floor(this.height / this.scale));
     if (!this.accumFb) return;
@@ -251,8 +271,8 @@ export class Tracer {
   private bindScene(p: Program, firstUnit: number): void {
     const s = this.scene!;
     const c = this.cam!;
-    const names = ['obj', 'mat', 'planes', 'spec', 'lam', 'lights', 'bvh', 'tri', 'targets'] as const;
-    const uni = ['uObj', 'uMat', 'uPlanes', 'uSpec', 'uLam', 'uLights', 'uBvh', 'uTri', 'uTargets'];
+    const names = ['obj', 'mat', 'planes', 'spec', 'lights', 'bvh', 'tri', 'targets'] as const;
+    const uni = ['uObj', 'uMat', 'uPlanes', 'uSpec', 'uLights', 'uBvh', 'uTri', 'uTargets'];
     names.forEach((n, i) => p.tex(uni[i]!, firstUnit + i, this.tex[n]!));
     p.i('uNumObj', s.numObj);
     p.i('uNumLights', s.numLights);
@@ -272,10 +292,39 @@ export class Tracer {
     p.f('uFocus', c.focus);
     p.i('uBlades', c.blades);
     p.i('uVignette', this.vignette ? 1 : 0);
+    p.fv('uLamK[0]', this.lamK);
+    p.fv('uInvPdfK[0]', this.invPdfK);
   }
 
   private get ltActive(): boolean {
     return this.useLT && this.scene !== null && this.scene.numTargets > 0 && this.scene.numLights > 0;
+  }
+  private get pmActive(): boolean { return this.usePM && this.ltActive; }
+
+  /** The gather radius in use, metres. */
+  get gatherRadius(): number { return Math.sqrt(this.radius2); }
+
+  /**
+   * Start a sweep: choose its wavelengths, shrink the gather radius, and trace the photons
+   * the sweep's camera paths will gather from.
+   */
+  private beginSweep(): void {
+    const lam = this.scene!.lam;
+    const u0 = (0.5 + this.frame * 0.6180339887498949) % 1;
+    for (let k = 0; k < NK; k++) {
+      const x = ((u0 + k / NK) % 1) * NL;
+      const i = Math.min(NL - 1, Math.floor(x));
+      this.lamK[k] = lam[i]! + (lam[i + 1]! - lam[i]!) * (x - i);
+      this.invPdfK[k] = NL * (lam[i + 1]! - lam[i]!);
+    }
+    if (this.radiusFrame < 0 || this.radiusFrame > this.frame) { this.radius2 = this.radius0 * this.radius0; this.radiusFrame = 0; }
+    while (this.radiusFrame < this.frame) {
+      this.radiusFrame++;
+      this.radius2 *= (this.radiusFrame - 1 + PM_ALPHA) / this.radiusFrame;
+    }
+    const f = this.frame + 1;
+    this.gridShift = [(f * 0.7548776662) % 1, (f * 0.5698402909) % 1, (f * 0.4301597090) % 1];
+    if (this.ltActive) this.photonBatch();
   }
 
   /**
@@ -291,6 +340,7 @@ export class Tracer {
     gl.disable(gl.BLEND);
     const pt = this.progs.pt;
     for (let n = 0; n < tiles; n++) {
+      if (this.cursor === 0) { this.beginSweep(); gl.disable(gl.BLEND); }
       const tx = (this.cursor % cols) * this.tileSize;
       const ty = Math.floor(this.cursor / cols) * this.tileSize;
       const tw = Math.min(this.tileSize, this.rw - tx);
@@ -301,6 +351,15 @@ export class Tracer {
       pt.ui('uFrame', this.frame);
       pt.uiv('uAlpha[0]', this.alphas);
       pt.i('uLT', this.ltActive ? 1 : 0);
+      pt.i('uPM', this.pmActive ? 1 : 0);
+      pt.tex('uHashA', 10, this.hashTex?.[0] ?? null);
+      pt.tex('uHashB', 11, this.hashTex?.[1] ?? null);
+      pt.tex('uHashN', 12, this.hashTex?.[2] ?? null);
+      pt.i('uHashW', Math.max(1, this.hashW));
+      pt.f('uCell', 2 * Math.sqrt(this.radius2));
+      pt.f('uRadius2', this.radius2);
+      pt.f('uPhotK', (this.photonSize * this.photonSize) / NK);
+      pt.v3('uGridShift', this.gridShift);
       pt.f('uClamp', this.clamp);
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.accumFb![1]);
       gl.viewport(0, 0, this.rw, this.rh);
@@ -315,7 +374,6 @@ export class Tracer {
       if (this.cursor >= total) {
         this.cursor = 0;
         this.frame++;
-        if (this.ltActive) this.photonBatch();
       }
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -325,25 +383,72 @@ export class Tracer {
     const gl = this.gl;
     const P = this.photonSize;
     if (!this.phot || this.photAlloc !== P) {
-      if (this.phot) { gl.deleteTexture(this.phot[0]); gl.deleteTexture(this.phot[1]); gl.deleteFramebuffer(this.photFb); }
-      this.phot = [createTexture(gl, 'rgba32f', P, P), createTexture(gl, 'rgba32f', P, P)];
+      if (this.phot) { for (const t of this.phot) gl.deleteTexture(t); gl.deleteFramebuffer(this.photFb); }
+      // Per photon: where it lands on the screen, its value there, where it landed in the
+      // scene with its weight, and the direction it came from with its wavelength slot.
+      this.phot = [0, 1, 2, 3].map(() => createTexture(gl, 'rgba32f', P, P));
       this.photFb = createFramebuffer(gl, this.phot);
       this.photAlloc = P;
+      if (this.hashTex) { for (const t of this.hashTex) gl.deleteTexture(t); gl.deleteFramebuffer(this.hashFb); gl.deleteFramebuffer(this.countFb); gl.deleteRenderbuffer(this.hashDepth); }
+      const H = 2 * P;
+      this.hashW = H;
+      this.hashTex = [createTexture(gl, 'rgba32f', H, H), createTexture(gl, 'rgba32f', H, H), createTexture(gl, 'rgba16f', H, H)];
+      this.hashDepth = gl.createRenderbuffer()!;
+      gl.bindRenderbuffer(gl.RENDERBUFFER, this.hashDepth);
+      gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, H, H);
+      this.hashFb = createFramebuffer(gl, [this.hashTex[0], this.hashTex[1]], this.hashDepth);
+      this.countFb = createFramebuffer(gl, [this.hashTex[2]]);
     }
     const lt = this.progs.lt;
     lt.use();
     this.bindScene(lt, 1);
     lt.ui('uFrame', this.frame);
+    lt.i('uPhotW', P);
     const c = this.cam!;
     lt.f('uPixArea', ((2 * c.tanHalf) / this.rh) ** 2);
+    gl.disable(gl.BLEND);
+    gl.disable(gl.SCISSOR_TEST);
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.photFb);
     gl.viewport(0, 0, P, P);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
+    if (this.pmActive) {
+      // Build the hashed grid: one random photon per texel (depth test on a random depth),
+      // then how many photons fell on each texel.
+      const H = this.hashW;
+      for (const pass of ['hash', 'count'] as const) {
+        const hp = this.progs[pass];
+        hp.use();
+        hp.tex('uPhotHit', 0, this.phot[2]!);
+        hp.tex('uPhotDir', 1, this.phot[3]!);
+        hp.i('uPhotW', P);
+        hp.i('uHashW', H);
+        hp.f('uCell', 2 * Math.sqrt(this.radius2));
+        hp.v3('uGridShift', this.gridShift);
+        hp.ui('uFrame', this.frame);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, pass === 'hash' ? this.hashFb : this.countFb);
+        gl.viewport(0, 0, H, H);
+        gl.clearColor(0, 0, 0, 0);
+        if (pass === 'hash') {
+          gl.enable(gl.DEPTH_TEST);
+          gl.depthFunc(gl.LESS);
+          gl.clearDepth(1);
+          gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        } else {
+          gl.enable(gl.BLEND);
+          gl.blendFunc(gl.ONE, gl.ONE);
+          gl.clear(gl.COLOR_BUFFER_BIT);
+        }
+        gl.drawArrays(gl.POINTS, 0, P * P);
+        gl.disable(gl.DEPTH_TEST);
+        gl.disable(gl.BLEND);
+      }
+    }
+
     const sp = this.progs.splat;
     sp.use();
-    sp.tex('uPhotPos', 0, this.phot[0]);
-    sp.tex('uPhotVal', 1, this.phot[1]);
+    sp.tex('uPhotPos', 0, this.phot[0]!);
+    sp.tex('uPhotVal', 1, this.phot[1]!);
     sp.i('uPhotW', P);
     sp.v2('uRes', this.rw, this.rh);
     gl.viewport(0, 0, this.rw, this.rh);

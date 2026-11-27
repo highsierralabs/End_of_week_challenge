@@ -46,6 +46,8 @@ async function trace(scene: Scene, spp: number, size = 256, lt = true): Promise<
   if (quick) spp = Math.max(64, Math.round(spp / 4));
   tracer.resize(size, size);
   tracer.useLT = lt;
+  const c = scene.camera;
+  tracer.radius0 = 0.006 * Math.hypot(c.pos[0] - c.target[0], c.pos[1] - c.target[1], c.pos[2] - c.target[2]);
   tracer.setScene(packScene(scene, lookup), scene.bounces);
   tracer.setCamera(cameraFrame(scene.camera, 1));
   let sweeps = 1;
@@ -331,6 +333,33 @@ const checks: Check[] = [
         rows: [
           { what: 'Mean luminance, photon pass on', measured: withLt, expected: alone.pt[1], unit: 'cd/m²', tol: 0.015 },
           { what: 'Share carried by photons', measured: (100 * both.lt[1]) / withLt, expected: (100 * both.lt[1]) / withLt, unit: '%', tol: 1, digits: 1 },
+        ],
+        image,
+      };
+    },
+  },
+  {
+    id: 'photon-map',
+    title: 'A caustic seen in a mirror',
+    note: 'The same caustic, but the camera looks only at a mirror. Light that reaches a surface through glass and is then seen through another specular bounce is beyond both tracers, so camera paths gather it from a map of the sweep\u2019s photons within a small, shrinking radius. That estimate is blurred, not exact, so the comparison is of the mean over a patch much wider than the blur, against the path tracer working alone for many more samples.',
+    run: async () => {
+      const s = base([
+        obj('Table', { kind: 'quad', half: [3, 3] }, white(), [0, 0, 0]),
+        obj('Ball', { kind: 'sphere', r: 0.1 }, { kind: 'glass', glass: 'bk7' }, [0, 0.1, 0]),
+        obj('Lamp', { kind: 'sphere', r: 0.03 }, { kind: 'light', spectrum: D65, lumens: 1000 }, [-0.3, 0.6, 0]),
+        obj('Mirror', { kind: 'box', half: [0.7, 0.4, 0.005] }, { kind: 'mirror' }, [0, 0.4, -0.405]),
+      ], { pos: [0.3, 0.5, 0.6], target: [0.15, 0, -0.8], focal: 60 }, { bounces: 16 });
+      const at = pixel(s, 256, [0.15, 0, -0.8]);
+      await trace(s, 1000, 256, true);
+      const on = meanY(at[0], at[1], 44);
+      const image = snapshot();
+      const radius = tracer.gatherRadius * 1000;
+      await trace(s, 6000, 256, false);
+      const alone = meanY(at[0], at[1], 44);
+      return {
+        rows: [
+          { what: 'Mean luminance of the reflected patch, photons on', measured: on, expected: alone, unit: 'cd/m\u00b2', tol: 0.025 },
+          { what: 'Gather radius after 1,000 sweeps (for reference)', measured: radius, expected: radius, unit: 'mm', tol: 1, digits: 2 },
         ],
         image,
       };

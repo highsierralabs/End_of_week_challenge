@@ -74,7 +74,7 @@ export function newtonPrism(): Scene {
   const s = scene('Prism and beam', [
     ...backdrop([0.3, 0.3, 0.3], [0.16, 0.16, 0.17]),
     obj('Fill light', { kind: 'quad', half: [0.4, 0.4] }, lamp(4500, 110), [0, 1.6, 0.6], [180, 0, 0]),
-    obj('Slit lamp', { kind: 'quad', half: [0.035, 0.0025] }, { kind: 'beam', spectrum: { kind: 'blackbody', kelvin: 5600 }, lumens: 5, spread: 0.25 }, [-0.75, 0.06, 0], [0, 0, -90]),
+    obj('Slit lamp', { kind: 'quad', half: [0.035, 0.0025] }, { kind: 'beam', spectrum: { kind: 'blackbody', kelvin: 5600 }, lumens: 0.7, spread: 0.25 }, [-0.75, 0.06, 0], [0, 0, -90]),
     obj('Prism', { kind: 'prism', sides: 3, apex: 60, size: 0.1, h: 0.06 }, glass('sf11'), [m.centre[0], 0.06, m.centre[1]], [90, m.turn, 0]),
     obj('Card', { kind: 'box', half: [0.3, 0.16, 0.004] }, matte([0.92, 0.92, 0.9]), [m.exit[0] + 0.8 * m.out[0], 0.16, m.exit[1] + 0.8 * m.out[1]], [0, (Math.atan2(-m.out[0], -m.out[1]) * 180) / Math.PI, 0]),
   ], { pos: [-0.4, 0.5, 0.62], target: [0.2, 0.1, -0.42], focus: 1.25, focal: 35 });

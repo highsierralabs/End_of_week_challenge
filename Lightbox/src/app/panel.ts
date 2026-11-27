@@ -330,7 +330,7 @@ export class Panel {
     this.body.append(group('Tracer',
       toggle('Photon pass for caustics', t.useLT, (on) => { t.useLT = on; t.reset(); }),
       toggle('Clamp fireflies (biased)', t.clamp < 1e20, (on) => { t.clamp = on ? 40 / Math.max(1e-9, s.view.autoExposure) : 1e30; t.reset(); }),
-      h('p', { class: 'lb-note', text: 'With the photon pass off, the path tracer finds caustics by itself: the same picture, far more slowly. Clamping removes bright speckles at the cost of a little lost light.' })));
+      h('p', { class: 'lb-note', text: 'With the photon pass off, the path tracer finds caustics by itself: the same picture, far more slowly. With it on, caustics seen through glass or in a mirror are gathered from a photon map and start slightly soft. Clamping removes bright speckles at the cost of a little lost light.' })));
     let size = 'view';
     let samples = 256;
     const sizes = [['view', 'This view'], ['1920x1080', '1920 × 1080'], ['2560x1440', '2560 × 1440'], ['3840x2160', '3840 × 2160'], ['2048x2048', '2048 × 2048']] as const;

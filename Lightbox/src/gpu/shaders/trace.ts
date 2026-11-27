@@ -9,6 +9,14 @@
 //     light -> one or more specular bounces -> surface seen directly by the camera
 // (the caustics), which the PT finds only by luck; the PT carries everything else and gives
 // zero weight to that one class when the LT is on. With the LT off the PT counts them itself.
+//
+// A third piece handles the same kind of light arriving at a surface the camera sees only
+// through glass or in a mirror (camera -> specular -> surface <- specular <- light), which
+// neither tracer can find efficiently. Each sweep's photons are also dropped into a hashed
+// grid (one random survivor per cell, weighted by the cell's count: Hachisuka and Jensen's
+// stochastic hashing), and a camera path arriving at such a surface gathers the photons within
+// a small radius. That estimate is slightly blurred, and the radius shrinks from sweep to sweep
+// (progressive photon mapping), so the blur goes to zero as the picture refines.
 import { COMMON } from './common';
 
 const SHARED = /* glsl */ `
@@ -92,8 +100,45 @@ ${SHARED}
 uniform sampler2D uPrev;
 uniform uint uAlpha[8];
 uniform int uLT;
+uniform int uPM;
+uniform sampler2D uHashA;
+uniform sampler2D uHashB;
+uniform sampler2D uHashN;
+uniform int uHashW;
+uniform float uCell;
+uniform float uRadius2;
+uniform float uPhotK;
+uniform vec3 uGridShift;
 uniform float uClamp;
 out vec4 outColor;
+
+// Radiance leaving x toward wo due to photons that arrived there through specular objects:
+// a density estimate over the photons of wavelength slot k within the gather radius.
+float gatherCaustic(vec3 x, vec3 n, vec3 wo, int mt, vec4 m0, int k) {
+  ivec3 base = ivec3(floor(x / uCell + uGridShift - 0.5));
+  float sum = 0.0;
+  float flat2 = 0.09 * uRadius2;
+  for (int i = 0; i < 8; i++) {
+    ivec3 c = base + ivec3(i & 1, (i >> 1) & 1, (i >> 2) & 1);
+    uint h = cellHash(c, k) % uint(uHashW * uHashW);
+    ivec2 t = ivec2(int(h) % uHashW, int(h) / uHashW);
+    vec4 B = texelFetch(uHashB, t, 0);
+    if (int(B.w + 0.5) != k + 1) continue;
+    vec4 A = texelFetch(uHashA, t, 0);
+    if (ivec3(floor(A.xyz / uCell + uGridShift)) != c) continue;
+    vec3 dv = x - A.xyz;
+    float dn = dot(dv, n);
+    if (dot(dv, dv) > uRadius2 || dn * dn > flat2) continue;
+    vec3 wi = -B.xyz;
+    float ci = dot(wi, n);
+    if (ci <= 1.0e-3) continue;
+    float fcos;
+    float pdf;
+    evalBsdf(mt, m0, n, wo, wi, fcos, pdf);
+    sum += A.w * texelFetch(uHashN, t, 0).r * fcos / ci;
+  }
+  return sum / (PI * uRadius2 * uPhotK);
+}
 
 // Low-discrepancy sample for dimension d: a Kronecker sequence over frames with a per-pixel
 // random shift, in exact integer arithmetic.
@@ -105,7 +150,8 @@ void main() {
   ivec2 px = ivec2(gl_FragCoord.xy);
   uint pix = pcg(uint(px.x) + pcg(uint(px.y) + 0x1234567u));
   gSeed = pcg(pix ^ pcg(uFrame + 0x9E3779B9u));
-  float invPdfLam = sampleWavelength(ld(0, pix));
+  int lamK = int(pcg(pix ^ pcg(uFrame * 0x85EBCA6Bu + 0x2545F491u)) % uint(NK));
+  float invPdfLam = useWavelength(lamK);
   initLights();
 
   vec2 uv = (vec2(px) + vec2(ld(1, pix), ld(2, pix)) - 0.5 * uRes) * (2.0 * uTanHalf / uRes.y);
@@ -178,7 +224,8 @@ void main() {
               w = bsdfPdf * bsdfPdf / (bsdfPdf * bsdfPdf + lp * lp);
             }
           }
-        } else if (uLT == 1 && li >= 0 && primaryDiffuse && nDiff == 1 && chain && chainOk) {
+        } else if (li >= 0 && nDiff == 1 && chain && chainOk && (primaryDiffuse ? uLT == 1 : uPM == 1)) {
+          // Light -> specular -> first matte surface: the photons' share (see the header).
           w = 0.0;
         }
         float c = thr * Le * w;
@@ -195,6 +242,11 @@ void main() {
       lastDelta = true;
     } else {
       if (dot(wo, ns) <= 0.0) ns = ng;
+      // ---- caustic light on a surface seen through glass or in a mirror: gather photons
+      if (uPM == 1 && nDiff == 0 && sawDelta) {
+        float g = thr * gatherCaustic(p, ns, wo, mt, m0, lamK);
+        L += min(g, uClamp);
+      }
       // ---- next-event estimation: one light, one shadow ray
       if (gLightSum > 0.0) {
         float pick;
@@ -329,15 +381,21 @@ export const LT_FRAG = /* glsl */ `#version 300 es
 ${COMMON}
 ${SHARED}
 uniform float uPixArea;
+uniform int uPhotW;
 layout(location = 0) out vec4 outPos;
 layout(location = 1) out vec4 outVal;
+layout(location = 2) out vec4 outHit;
+layout(location = 3) out vec4 outDir;
 
 void main() {
   outPos = vec4(0.0);
   outVal = vec4(0.0);
+  outHit = vec4(0.0);
+  outDir = vec4(0.0);
   ivec2 px = ivec2(gl_FragCoord.xy);
   gSeed = pcg(uint(px.x) + pcg(uint(px.y) + pcg(uFrame ^ 0xABCDEF1u)));
-  float invPdfLam = sampleWavelength(rnd());
+  int lamK = (px.x + px.y * uPhotW) % NK;
+  float invPdfLam = useWavelength(lamK);
   initLights();
   if (uNumTargets == 0 || !(gLightSum > 0.0)) return;
 
@@ -424,7 +482,10 @@ void main() {
       continue;
     }
     if (specCount == 0) return;
-    // ---- first non-specular surface: connect to the lens
+    // ---- first non-specular surface: leave a photon for the map (position, weight, the
+    // direction it came from, its wavelength slot), then connect to the lens
+    outHit = vec4(p, alpha);
+    outDir = vec4(rd, float(lamK + 1));
     vec3 lensP = uCamPos;
     if (uLensR > 0.0) {
       vec2 a = sampleAperture(vec2(rnd(), rnd())) * uLensR;
@@ -457,6 +518,67 @@ void main() {
     cmax = dist;
   }
 }
+`;
+
+const HASH_COMMON = /* glsl */ `
+precision highp float;
+precision highp int;
+precision highp sampler2D;
+uint pcg(uint v) {
+  uint s = v * 747796405u + 2891336453u;
+  uint w = ((s >> ((s >> 28u) + 4u)) ^ s) * 277803737u;
+  return (w >> 22u) ^ w;
+}
+uint cellHash(ivec3 c, int k) {
+  return pcg(uint(c.x) + pcg(uint(c.y) + pcg(uint(c.z) + pcg(uint(k) + 0x51ED27u))));
+}
+`;
+
+/**
+ * Drops each photon into its cell of the hashed grid: one point per photon at the cell's texel.
+ * A random depth lets the depth test keep one photon per texel, uniformly at random.
+ */
+export const HASH_VERT = /* glsl */ `#version 300 es
+${HASH_COMMON}
+uniform sampler2D uPhotHit;
+uniform sampler2D uPhotDir;
+uniform int uPhotW;
+uniform int uHashW;
+uniform float uCell;
+uniform vec3 uGridShift;
+uniform uint uFrame;
+flat out vec4 vHit;
+flat out vec4 vDir;
+void main() {
+  ivec2 c = ivec2(gl_VertexID % uPhotW, gl_VertexID / uPhotW);
+  vHit = texelFetch(uPhotHit, c, 0);
+  vDir = texelFetch(uPhotDir, c, 0);
+  gl_PointSize = 1.0;
+  if (vDir.w < 0.5) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+  ivec3 cell = ivec3(floor(vHit.xyz / uCell + uGridShift));
+  uint h = cellHash(cell, int(vDir.w + 0.5) - 1) % uint(uHashW * uHashW);
+  vec2 t = vec2(float(int(h) % uHashW), float(int(h) / uHashW));
+  float depth = float(pcg(uint(gl_VertexID) ^ pcg(uFrame + 0x77u)) >> 8) * (1.0 / 16777216.0);
+  gl_Position = vec4((t + 0.5) / float(uHashW) * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+}
+`;
+
+export const HASH_FRAG = /* glsl */ `#version 300 es
+precision highp float;
+flat in vec4 vHit;
+flat in vec4 vDir;
+layout(location = 0) out vec4 outA;
+layout(location = 1) out vec4 outB;
+void main() { outA = vHit; outB = vDir; }
+`;
+
+/** Counts the photons that fell on each texel (drawn with additive blending). */
+export const COUNT_FRAG = /* glsl */ `#version 300 es
+precision highp float;
+flat in vec4 vHit;
+flat in vec4 vDir;
+out vec4 outColor;
+void main() { outColor = vec4(1.0, 0.0, 0.0, 0.0); }
 `;
 
 /** Draws one point per photon, at the pixel it landed on. */

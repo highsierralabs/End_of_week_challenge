@@ -51,6 +51,7 @@ export class Program {
   v3(name: string, v: readonly number[]): void { this.gl.uniform3f(this.loc(name), v[0]!, v[1]!, v[2]!); }
   m3(name: string, rowMajor: readonly number[]): void { this.gl.uniformMatrix3fv(this.loc(name), true, rowMajor as number[]); }
   uiv(name: string, v: Uint32Array): void { this.gl.uniform1uiv(this.loc(name), v); }
+  fv(name: string, v: Float32Array): void { this.gl.uniform1fv(this.loc(name), v); }
   tex(name: string, unit: number, t: WebGLTexture | null): void {
     const gl = this.gl;
     gl.activeTexture(gl.TEXTURE0 + unit);
@@ -77,9 +78,10 @@ export function createTexture(gl: WebGL2RenderingContext, format: TexFormat, w: 
   return t;
 }
 
-export function createFramebuffer(gl: WebGL2RenderingContext, attachments: WebGLTexture[]): WebGLFramebuffer {
+export function createFramebuffer(gl: WebGL2RenderingContext, attachments: WebGLTexture[], depth: WebGLRenderbuffer | null = null): WebGLFramebuffer {
   const fb = gl.createFramebuffer()!;
   gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  if (depth) gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depth);
   attachments.forEach((t, i) => gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, t, 0));
   gl.drawBuffers(attachments.map((_, i) => gl.COLOR_ATTACHMENT0 + i));
   const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
