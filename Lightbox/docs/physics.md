@@ -80,12 +80,15 @@ Every shape is intersected exactly in its own space (`gpu/shaders/common.ts`, mi
   8 kites, 16 upper girdle, 16 lower girdle, 8 pavilion mains) plus a 16-sided girdle, with standard proportions
   (table 56%, crown 34.5°, pavilion 40.8°). A unit test checks that it is convex and that every facet touches its
   junctions;
-- **lenses** as a cylinder cut by two spheres or planes: each candidate surface crossing is kept only if it lies on
-  the lens;
+- **lenses** as the part of a cylinder below one spherical (or flat) face and above another: each candidate surface
+  crossing is kept only if it lies on that solid. A spherical face cannot span an aperture wider than its own
+  radius, so the aperture is reduced to fit the more curved face; a unit test checks that eight lens shapes, from
+  thin to rod-like, are closed;
 - **triangle meshes** behind a binned-SAH bounding volume hierarchy, traversed in the shader with a 32-entry stack.
   Smooth meshes use interpolated normals for shading and the face normal to decide inside from outside.
 
-Rays start 20 µm off the surface they leave. Sphere and cylinder intersections use the perpendicular-distance form of
+Rays start 20 µm off the surface they leave. Two surfaces in exactly the same plane cannot be told apart, so objects
+resting on the table stand 0.1 mm above it (there is air under a real glass too). Sphere and cylinder intersections use the perpendicular-distance form of
 the quadratic, which stays accurate for a small sphere far from the ray's origin.
 
 ## Materials
@@ -93,9 +96,12 @@ the quadratic, which stays accurate for a small sphere far from the ray's origin
 - **Matte:** Lambertian.
 - **Glass:** smooth dielectric with the unpolarised Fresnel equations, Snell refraction at the wavelength's index,
   total internal reflection, and Beer-Lambert absorption for tinted glass (the tint's absorption coefficient is set
-  so that the chosen colour is reached after a chosen depth).
+  so that the chosen colour is reached after a chosen depth). Radiance is not conserved across a refracting surface;
+  radiance over n² is. Camera paths therefore scale what they carry by (n_from / n_to)² at each refraction, so a
+  lamp seen inside glass is larger and dimmer, as it should be; photons carry flux and take no such factor.
 - **Metal:** the exact conductor Fresnel reflectance from n(λ) and k(λ); polished, or rough with a GGX microfacet
-  distribution sampled by visible normals.
+  distribution sampled by visible normals. Roughness below 0.02 is treated as polished: the lobe is then narrower
+  than a pixel and single-precision arithmetic cannot represent it.
 - **Glossy (plastic, lacquer):** a matte base under a clear coat of index 1.5. The base term includes the Fresnel
   transmission in and out and the internal reflections, so the model is reciprocal and conserves energy; the coat is
   a mirror reflection or a GGX lobe.
@@ -110,7 +116,8 @@ the quadratic, which stays accurate for a small sphere far from the ray's origin
 
 **Path tracing.** Paths start at the camera. At each matte or rough surface one lamp is chosen in proportion to its
 emission at the path's wavelength, a point on it is sampled (spheres by solid angle, the others by area, beams by
-their cone), and a shadow ray is traced; the result is combined with the chance of the scattered ray itself hitting
+a point on the aperture when the surface is far away and by a direction from the cone when it is close), and a
+shadow ray is traced, which ignores the lamp it is aimed at; the result is combined with the chance of the scattered ray itself hitting
 the lamp by the power heuristic. Paths end by Russian roulette. The shader traces one ray per loop iteration, shadow
 rays included, so the intersection code is compiled once.
 

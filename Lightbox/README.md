@@ -31,7 +31,7 @@ nothing leaves the device.
   afresh at up to 3840 × 2160 to a sample count you choose.
 - **Tour.** Twelve live scenes, each on one thing light does: soft shadows, colour bleeding, Fresnel reflection,
   refraction, caustics, dispersion, the fire of a diamond, line spectra, a single-wavelength lamp, depth of field,
-  chromatic aberration. Every step can be opened in the studio and changed.
+  the aberrations of a lens. Every step can be opened in the studio and changed.
 - **Spectroscope.** A thin tube of glowing gas (hydrogen, helium, neon, sodium, argon, krypton, xenon or mercury)
   seen through a 1,200 line/mm grating or a flint-glass prism, so that every emission line makes its own image of the
   tube above a wavelength scale. Then a quiz: name the gas from its spectrum alone.
@@ -43,7 +43,7 @@ nothing leaves the device.
 
 ![Newton's experiment: a slit of white light through a dense flint prism, spread into a spectrum on a card](docs/screenshots/prism.jpg)
 
-![The spectroscope: mercury through the grating, its violet, green and yellow lines above the wavelength scale](docs/screenshots/spectroscope.gif)
+![The spectroscope: neon, hydrogen, helium, sodium, mercury and argon in turn, each line an image of the tube above the wavelength scale](docs/screenshots/spectroscope.gif)
 
 ![The camera tab: lens rings for focal length, aperture and focus; an 85 mm lens at f/1.4 turns distant lamps into hexagons](docs/screenshots/camera.jpg)
 
@@ -80,29 +80,44 @@ The full model, with its approximations, is in [docs/physics.md](docs/physics.md
 ## Validation
 
 A renderer can look right and be wrong, so Lightbox comes with a page that measures it:
-[validation.html](https://highsierralabs.github.io/End_of_week_challenge/lightbox/validation.html) renders twelve
+[validation.html](https://highsierralabs.github.io/End_of_week_challenge/lightbox/validation.html) renders fourteen
 small scenes on your GPU and compares what the tracer accumulated with values known in advance. On the machine it was
-built on (RTX 4070 Super, Chromium, Direct3D 11) all 35 comparisons agree, with the same figures on every run:
+built on (RTX 4070 Super, Chromium, Direct3D 11) all 38 comparisons agree, with the same figures on every run:
 
 | Check | Compared with | Largest difference |
 |---|---|---|
 | Grey ball in uniform light (furnace test) | reflectance × surround | 0.06% |
 | Glass ball in uniform light: must vanish | the surround | 0.11% |
-| Small lamp over a table, at three distances | inverse-square and cosine laws | 0.24% |
-| Rectangular lamp, at three points | closed-form irradiance of a rectangle | 1.6% |
-| Reflection in black glass, 15° to 85° | Fresnel's equations over the lamp's spectrum | 0.65% |
-| Laser beams through a prism, 450 / 550 / 650 nm | exact trace with the Sellmeier index | 0.10 mm at 1 m |
-| Parallel beams through a thick lens | exact trace through both faces | 0.010 mm |
-| Photon pass on, against the path tracer alone | the same total light | 0.13% |
-| A caustic seen in a mirror (photon map) | the path tracer alone | 0.42% |
-| Chromaticity of D65, illuminant A, neon | published CIE values; the direct integral | 0.0006 in x, y |
+| Small lamp over a table, at three distances | inverse-square and cosine laws | 0.26% |
+| Rectangular lamp, at three points | closed-form irradiance of a rectangle | 0.61% |
+| Reflection in black glass, 15° to 85° | Fresnel's equations over the lamp's spectrum | 0.61% |
+| Laser beams through a prism, 450 / 550 / 650 nm | exact trace with the Sellmeier index | 0.03 mm at 1 m |
+| Parallel beams through a thick lens | exact trace through both faces | 0.016 mm |
+| A caustic, photon pass on (photons carry 95% of it) | the path tracer alone | 0.37% |
+| A lamp inside a glass ball, seen through the glass | transmission / n² | 0.11% |
+| The light that lamp throws on the table | the path tracer alone; inverse square × transmission | 0.18%; 0.39% |
+| A spotlight's pool, bare | radiance × projected solid angle | 0.15% |
+| The same through a glass pane (all photons) | × (1 − R)/(1 + R) and the pane's optical shift | 0.19% |
+| A caustic seen in a mirror (photon map) | the path tracer alone | 0.94% |
+| Chromaticity of D65, illuminant A, neon | published CIE values; the direct integral | 0.0005 in x, y |
 | Triangle mesh ball against the exact sphere | the exact sphere | 0.07% |
-| Blur disc of an out-of-focus point | thin-lens formula | 2.8% |
+| Blur disc of an out-of-focus point | thin-lens formula | 0.21% |
 
-The page earned its keep during the build. Its first run showed light from a small, distant lamp reading 0.4% low at
-1 m and 2.3% low at 2 m. The cause was a shadow ray whose length came from a cancelling quadratic: near the lamp's
-edge the ray overshot and was stopped by the lamp itself. Shadow rays now ignore the lamp they are aimed at, and the
-figures above are from after that fix.
+Not covered by any check with a known answer: glossy and rough materials, glass meshes, the grating.
+
+The page earned its keep during the build, and so did review:
+
+- Its first run showed light from a small, distant lamp reading 0.4% low at 1 m and 2.3% low at 2 m. The cause was
+  a shadow ray whose length came from a cancelling quadratic: near the lamp's edge it overshot and was stopped by
+  the lamp itself.
+- An independent code review then found something the page could not see at the time: a camera path that crosses
+  into glass must scale radiance by the ratio of the indices squared. Without it, a lamp embedded in crown glass
+  looked 2.3 times too bright (5.8 times in diamond). The "lamp inside a glass ball" check was added with the fix.
+- Writing the pane check, the tracer disagreed with my formula by 1.6%, repeatably. The tracer was right: a pane
+  of thickness t brings a source optically closer by t(1 − 1/n), which I had left out.
+- The same review pointed out that three rows compared a number with itself and that one tolerance was loose
+  enough to hide a 23% error in the photons. Rows that only report a figure are now marked as such and not counted,
+  and the photon check compares the caustic itself.
 
 ![The validation page: measured against expected, with the allowed difference](docs/screenshots/validation.png)
 
@@ -110,10 +125,10 @@ figures above are from after that fix.
 
 Verified on the build machine (Windows, RTX 4070 Super, headless and headed Chromium):
 
-- `npm run check`: typecheck, lint and 130 unit tests (spectra and colour against published values, glass formulas
-  against catalogue indices, the brilliant cut's convexity, lens and polytope intersections, the mesh BVH against
+- `npm run check`: typecheck, lint and 150 unit tests (spectra and colour against published values, glass formulas
+  against catalogue indices, the brilliant cut's convexity, lens solids closed for any radii, the mesh BVH against
   brute force, share-link sanitising, every built-in scene packing to finite data and surviving a link round trip,
-  prisms standing at minimum deviation).
+  prisms standing at minimum deviation, the spectroscope's framing at seven picture shapes).
 - `npm run smoke`: the production build served from a subfolder and driven like a visitor: boot, select, drag, undo,
   orbit, focus, the inspector, a lens ring, all seven scenes, all twelve tour steps, sixteen spectroscope views and
   the quiz, a share-link round trip, save and export, a dropped model, the validation page, a phone-sized touch
@@ -121,8 +136,8 @@ Verified on the build machine (Windows, RTX 4070 Super, headless and headed Chro
 
 Not verified:
 
-- **Real phones and tablets.** The phone layout and touch handling were tested only in an emulated viewport on a
-  desktop GPU. The software renderer shows the app stays alive and adapts on a very slow device, but that is not a
+- **Real phones and tablets.** The phone layout and touch handling were tested only in emulated viewports on a
+  desktop GPU (by the smoke test and by a separate QA pass at 390 × 844 and 820 × 1180). The software renderer shows the app stays alive and adapts on a very slow device, but that is not a
   phone's GPU or its shader compiler.
 - **Safari and Firefox.** Only Chromium was run.
 - **OpenGL drivers.** ANGLE's OpenGL backend could not be tested: in headless Chromium on the build machine it loses
@@ -138,6 +153,8 @@ Not verified:
   approximate, most of all for krypton and xenon.
 - Caustics seen through glass or in a mirror come from a photon map: slightly soft at first, sharpening as the
   picture refines.
+- Two surfaces in exactly the same plane are a coin toss, so resting objects stand a tenth of a millimetre above
+  the table.
 - A colour picked on screen becomes one of the many spectra that have that colour.
 
 ## Run it

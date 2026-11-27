@@ -1,6 +1,6 @@
 // PURPOSE: Make the README pictures and clips of Lightbox from the production build: stills as
-//          PNG or JPEG after a set number of samples, clips as GIFs with Playwright's video
-//          recorder and ffmpeg.
+//          PNG or JPEG after a set number of samples, clips as GIFs with
+//          Playwright's video recorder, cut by ffmpeg.
 // USAGE:   npm run build && npx vite preview   (port 5197), then
 //          node scripts/clip.mjs stills | studio | spectroscope | all
 // OUTPUT:  docs/screenshots/*.jpg and *.png, card.jpg, studio.gif, spectroscope.gif
@@ -31,7 +31,7 @@ async function stills() {
     ['prism.jpg', [1280, 720], "window.lightbox.go('scene:prism')", 4000, true],
     ['lens.jpg', [1280, 720], "window.lightbox.go('scene:lens')", 4000, true],
     ['tour.jpg', [1280, 720], "window.lightbox.go('tour:9')", 3000, false],
-    ['camera.jpg', [1280, 720], "(async () => { await window.lightbox.go('tour:10'); await window.lightbox.setMode('studio'); document.querySelector('[data-tab=camera]').click(); })()", 3000, false],
+    ['camera.jpg', [1280, 720], "(async () => { await window.lightbox.go('tour:10'); [...document.querySelectorAll('.lb-tour button')].find((b) => /in the studio/.test(b.textContent)).click(); await new Promise((r) => setTimeout(r, 600)); document.querySelector('[data-tab=camera]').click(); })()", 3000, false],
     ['spectroscope.png', [1280, 720], "(async () => { await window.lightbox.setMode('spectro'); document.querySelector('.lb-spectro [data-gas=Hg]').click(); })()", 4000, false],
     ['phone.jpg', [390, 780], "window.lightbox.go('scene:gems')", 1500, false],
   ];
@@ -47,8 +47,8 @@ async function stills() {
     await samples(page, spp);
     await page.screenshot(name.endsWith('.jpg') ? { path: join(outDir, name), type: 'jpeg', quality: 90 } : { path: join(outDir, name) });
     console.log(`still: ${name}`);
-    if (name === 'gems.jpg') {
-      // The index card: the same picture, 1200 x 675 JPEG.
+    if (name === 'lens.jpg') {
+      // The index card: the ray box, 1200 x 675 JPEG.
       const r = spawnSync('ffmpeg', ['-y', '-i', join(outDir, name), '-vf', 'scale=1200:675:flags=lanczos', '-q:v', '4', join(outDir, 'card.jpg')], { encoding: 'utf8' });
       if (r.status !== 0) console.log(r.stderr.split('\n').slice(-5).join('\n'));
     }
@@ -62,58 +62,86 @@ async function stills() {
   await browser.close();
 }
 
-async function clip(name, W, H, act, { fps, width, colors = 128 }) {
+// Clips are filmed with Playwright's video recorder, whose clock does not line up with ours. So
+// the action is bracketed by two flashes of solid magenta, and the cut is made between them by
+// looking for those frames in the recording.
+const flash = (page) => page.evaluate(() => new Promise((res) => {
+  const d = document.createElement('div');
+  d.style.cssText = 'position:fixed;inset:0;background:#ff00ff;z-index:99999';
+  document.body.append(d);
+  setTimeout(() => { d.remove(); requestAnimationFrame(() => requestAnimationFrame(() => res())); }, 800);
+}));
+
+async function clip(name, W, H, act, { fps, width, colors = 128, dither = 'bayer:bayer_scale=5' }) {
   const tmp = join(root, 'shots', 'video');
   rmSync(tmp, { recursive: true, force: true });
   mkdirSync(tmp, { recursive: true });
   const browser = await launch();
   const ctx = await browser.newContext({ viewport: { width: W, height: H }, recordVideo: { dir: tmp, size: { width: W, height: H } } });
   const page = await ctx.newPage();
-  const t0 = Date.now();
   await page.goto(base);
   await ready(page);
   await hideToast(page);
-  const span = await act(page, () => (Date.now() - t0) / 1000);
+  await act(page, () => flash(page));
+  await flash(page);
+  await page.waitForTimeout(800);
   await ctx.close();
   await browser.close();
   const webm = join(tmp, readdirSync(tmp).find((f) => f.endsWith('.webm')));
+  // Find the two flashes: tiny frames at 25 per second, magenta ones marked.
+  const RATE = 25;
+  const raw = spawnSync('ffmpeg', ['-v', 'error', '-i', webm, '-vf', `fps=${RATE},scale=8:8`, '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'], { maxBuffer: 1 << 28 });
+  const frames = Math.floor(raw.stdout.length / 192);
+  const magenta = [];
+  for (let i = 0; i < frames; i++) {
+    let r = 0, g = 0, b = 0;
+    for (let k = 0; k < 64; k++) { r += raw.stdout[i * 192 + k * 3]; g += raw.stdout[i * 192 + k * 3 + 1]; b += raw.stdout[i * 192 + k * 3 + 2]; }
+    magenta.push(r / 64 > 180 && b / 64 > 180 && g / 64 < 90);
+  }
+  // The first flash runs from the first magenta frame until half a second passes without one
+  // (a flash can be recorded with gaps); the second flash is the last run of magenta frames.
+  const first = magenta.indexOf(true);
+  let startFrame = first;
+  for (let i = first; i >= 0 && i < frames && i - startFrame < RATE / 2; i++) if (magenta[i]) startFrame = i + 1;
+  let endFrame = magenta.lastIndexOf(true);
+  while (endFrame > startFrame && magenta[endFrame - 1]) endFrame--;
+  if (first < 0 || endFrame <= startFrame + RATE) { console.log(`clip ${name}: could not find the two marker flashes`); process.exit(1); }
+  const from = (startFrame + 1) / RATE;
+  const length = (endFrame - 1 - startFrame - 1) / RATE;
   const out = join(outDir, `${name}.gif`);
-  const filter = `fps=${fps},scale=${width}:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=${colors}:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle`;
-  const r = spawnSync('ffmpeg', ['-y', '-ss', String(span.start), '-t', String(span.end - span.start), '-i', webm, '-vf', filter, '-loop', '0', out], { encoding: 'utf8' });
+  const filter = `fps=${fps},scale=${width}:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=${colors}:stats_mode=diff[p];[b][p]paletteuse=dither=${dither}:diff_mode=rectangle`;
+  const r = spawnSync('ffmpeg', ['-y', '-ss', from.toFixed(3), '-t', length.toFixed(3), '-i', webm, '-vf', filter, '-loop', '0', out], { encoding: 'utf8' });
   if (r.status !== 0) { console.log(r.stderr.split('\n').slice(-8).join('\n')); process.exit(1); }
-  console.log(`clip: ${name}.gif (${(span.end - span.start).toFixed(1)} s)`);
+  console.log(`clip: ${name}.gif (${length.toFixed(1)} s)`);
 }
 
-const studio = () => clip('studio', 1280, 720, async (page, now) => {
+const studio = () => clip('studio', 1280, 720, async (page, start) => {
   // Start from a fresh picture so the clip opens on the noise clearing.
+  await start();
   await page.evaluate(() => window.lightbox.go('scene:still'));
-  const start = now();
-  await page.waitForTimeout(2600);
+  await page.waitForTimeout(2000);
   const ball = await page.evaluate(() => window.lightbox.pointOf(window.lightbox.store.scene.objects.find((o) => o.name === 'Glass ball').id));
   await page.mouse.move(ball.x, ball.y);
   await page.mouse.down();
-  await page.mouse.move(ball.x + 150, ball.y + 40, { steps: 28 });
-  await page.waitForTimeout(150);
-  await page.mouse.move(ball.x + 260, ball.y - 30, { steps: 24 });
+  await page.mouse.move(ball.x + 150, ball.y + 40, { steps: 18 });
+  await page.mouse.move(ball.x + 260, ball.y - 30, { steps: 16 });
   await page.mouse.up();
-  await page.waitForTimeout(2400);
+  await page.waitForTimeout(2000);
   await page.mouse.move(500, 130);
   await page.mouse.down();
-  await page.mouse.move(380, 170, { steps: 30 });
+  await page.mouse.move(400, 165, { steps: 18 });
   await page.mouse.up();
-  await page.waitForTimeout(2600);
-  return { start, end: now() };
-}, { fps: 10, width: 800, colors: 160 });
+  await page.waitForTimeout(2200);
+}, { fps: 6, width: 600, colors: 56, dither: 'none' });
 
-const spectroscope = () => clip('spectroscope', 1280, 720, async (page, now) => {
+const spectroscope = () => clip('spectroscope', 1280, 720, async (page, start) => {
   await page.click('[data-mode="spectro"]');
   await page.waitForTimeout(600);
-  const start = now();
+  await start();
   for (const gas of ['Ne', 'H', 'He', 'Na', 'Hg', 'Ar']) {
     await page.click(`.lb-spectro [data-gas="${gas}"]`);
     await page.waitForTimeout(1700);
   }
-  return { start, end: now() };
 }, { fps: 6, width: 800, colors: 96 });
 
 if (which === 'stills' || which === 'all') await stills();

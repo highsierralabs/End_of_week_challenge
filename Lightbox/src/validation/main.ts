@@ -357,7 +357,9 @@ const checks: Check[] = [
     title: 'A lamp inside a glass ball',
     note: 'Radiance is not conserved when light crosses into glass; radiance divided by the square of the index is. A lamp at the centre of a crown-glass ball must therefore look larger and dimmer from outside: its luminance through the glass is the transmitted fraction over n\u00b2. The light it throws on the table, carried by photons or found by the path tracer alone, must agree, and follows the inverse-square law times the transmission.',
     run: async () => {
-      const r = 0.02;
+      // A small lamp: the laws below hold for a point at the centre, and a lamp a tenth of the
+      // ball's radius is within half a percent of that.
+      const r = 0.01;
       const Ls = 1000 / (4 * Math.PI * Math.PI * r * r);
       const spec = lightSpectrum(D65);
       const wT = new Float32Array(NS);
@@ -375,7 +377,7 @@ const checks: Check[] = [
       ];
       const look = base(objects, { pos: [0, 0.3, 1], target: [0, 0.3, 0], focal: 200 }, { bounces: 12 });
       await trace(look, 600);
-      const seen = meanY(128, 128, 8);
+      const seen = meanY(128, 128, 6);
       const image = snapshotPeak();
       const floor = base(objects, { pos: [1.3, 1.0, 0.9], target: [0.6, 0, 0], focal: 50 }, { bounces: 12 });
       const at = pixel(floor, 256, [0.6, 0, 0]);
