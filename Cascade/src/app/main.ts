@@ -11,6 +11,7 @@ import { SimClient } from '../sim/client';
 import { Stage, type CameraPreset } from '../render/stage';
 import { createObservatory } from '../ui/observatory';
 import { renderDetector } from '../ui/detectorCard';
+import { maybeShowWelcome } from '../ui/welcome';
 import { detectorExposure } from '../physics/detector';
 import { Sonifier } from '../audio/sonify';
 
@@ -227,6 +228,13 @@ window.addEventListener('keydown', (e) => {
 
 void start();
 void run(controls.getParams());
+if (!q.has('clean') && !q.has('data')) {
+  maybeShowWelcome(layout.overlay, {
+    onTour: () => tour.open(),
+    onSky: () => void runSky(),
+    onExplore: () => undefined,
+  }, q.has('welcome'));
+}
 // Expose a tiny hook for automated screenshots and debugging.
 (window as unknown as { cascade: unknown }).cascade = {
   get result() { return result; },
