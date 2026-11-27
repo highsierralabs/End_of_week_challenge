@@ -11,7 +11,7 @@
 //   uPlanes RGBA32F, 256 wide: polytope planes (n, d) in object space
 //   uSpec   R32F, NS wide: one spectrum per row, linear in wavelength from LAM0 to LAM1
 //   uLam    R32F, (NL + 1) x 1: inverse CDF of the wavelength sampler
-//   uLights RGBA32F, 4 texels per light row: (object, cdf, pick probability, area), then the
+//   uLights RGBA32F, 4 texels per light row: (object, spectrum row, share of the flux, area), then the
 //             object-to-world rows
 //   uBvh    RGBA32F, 2048 wide, 2 texels per node; uTri RGBA32F, 2048 wide, 6 texels per triangle
 //   uTargets RGBA32F, one bounding sphere per row: the specular objects photons are aimed at
@@ -163,8 +163,13 @@ void hitSphere(vec3 o, vec3 d, inout float bt, inout vec3 bn) {
   if (t > 0.0 && t < bt) { bt = t; bn = o + d * t; }
 }
 
+// 1 / d with zero components nudged, so a slab test never multiplies zero by infinity.
+vec3 safeInv(vec3 d) {
+  return 1.0 / mix(d, vec3(1.0e-20), lessThan(abs(d), vec3(1.0e-20)));
+}
+
 void hitBox(vec3 o, vec3 d, inout float bt, inout vec3 bn) {
-  vec3 inv = 1.0 / d;
+  vec3 inv = safeInv(d);
   vec3 ta = (-1.0 - o) * inv;
   vec3 tb = (1.0 - o) * inv;
   vec3 tn = min(ta, tb);
@@ -307,7 +312,7 @@ void hitLens(vec3 o, vec3 d, vec4 P, inout float bt, inout vec3 bn) {
 vec4 bvhTexel(int i) { return texelFetch(uBvh, ivec2(i & 2047, i >> 11), 0); }
 vec4 triTexel(int i) { return texelFetch(uTri, ivec2(i & 2047, i >> 11), 0); }
 void hitMesh(vec3 o, vec3 d, int root, bool anyHit, inout float bt, inout vec3 bn, inout vec3 bns) {
-  vec3 inv = 1.0 / d;
+  vec3 inv = safeInv(d);
   int stack[32];
   int sp = 0;
   int node = root;
@@ -543,14 +548,32 @@ float emitted(int mtype, vec4 m0, vec4 m1, vec3 n, vec3 dir) {
   return m1.x * spec(int(m0.y));
 }
 
-// Pick a light in proportion to its power. Returns its row; pick receives the probability.
+// Lights are chosen in proportion to what each emits at this path's wavelength, so a ray of
+// neon-red light is connected to the neon tube and not to the softbox beside it.
+float gLightSum;
+float lightWeight(int l) {
+  vec4 L0 = lightTexel(l, 0);
+  return L0.z * spec(int(L0.y));
+}
+void initLights() {
+  gLightSum = 0.0;
+  for (int i = 0; i < uNumLights; i++) gLightSum += lightWeight(i);
+}
+// Returns the chosen light's row; pick receives the probability of that choice.
 int pickLight(float u, out float pick) {
+  float target = u * gLightSum;
+  float acc = 0.0;
   int l = 0;
+  float w = 0.0;
   for (int i = 0; i < uNumLights; i++) {
+    float wi = lightWeight(i);
+    if (wi <= 0.0) continue;
     l = i;
-    if (u < lightTexel(i, 0).y) break;
+    w = wi;
+    acc += wi;
+    if (acc > target) break;
   }
-  pick = lightTexel(l, 0).z;
+  pick = w / gLightSum;
   return l;
 }
 
@@ -609,10 +632,10 @@ float lightPdf(int l, int otype, vec3 x, vec3 p, vec3 n) {
     float r2 = L0.w / (4.0 * PI);
     if (dc2 <= r2 * 1.0001) return 0.0;
     float cosMax = sqrt(max(0.0, 1.0 - r2 / dc2));
-    return L0.z / (2.0 * PI * (1.0 - cosMax));
+    return lightWeight(l) / gLightSum / (2.0 * PI * (1.0 - cosMax));
   }
   float c = abs(dot(n, d)) / sqrt(d2);
   if (c < 1.0e-6) return 0.0;
-  return L0.z * d2 / (c * L0.w);
+  return lightWeight(l) / gLightSum * d2 / (c * L0.w);
 }
 `;

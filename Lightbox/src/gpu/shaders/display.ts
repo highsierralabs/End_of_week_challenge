@@ -44,6 +44,7 @@ out vec4 outColor;
 void main() {
   vec2 cell = uSrcRes / uDstRes;
   float lin = 0.0;
+  float peak = 0.0;
   for (int j = 0; j < 4; j++) {
     for (int i = 0; i < 4; i++) {
       ivec2 p = ivec2((floor(gl_FragCoord.xy) + (vec2(float(i), float(j)) + 0.5) / 4.0) * cell);
@@ -52,9 +53,10 @@ void main() {
       float y = a.g / max(a.a, 1.0);
       if (uPhotons > 0.0) y += texelFetch(uLT, p, 0).g / uPhotons;
       lin += y;
+      peak = max(peak, y);
     }
   }
-  outColor = vec4(log(max(lin / 16.0, 1.0e-3)), lin / 16.0, 0.0, 1.0);
+  outColor = vec4(log(max(lin / 16.0, 1.0e-3)), lin / 16.0, peak, 1.0);
 }
 `;
 
@@ -136,13 +138,13 @@ void main() {
   vec2 uv = gl_FragCoord.xy / uRes;
   vec3 c = texelFetch(uHdr, ivec2(gl_FragCoord.xy), 0).rgb;
   if (uBloomAmount > 0.0) c += texture(uBloom, uv).rgb * uBloomAmount;
-  // Colours outside the display's gamut (a spectral line is far outside it) are pulled toward
-  // grey of the same luminance until they fit.
+  // Colours outside the display's gamut (a spectral line is far outside it): drop the negative
+  // parts, which keeps the hue, then restore the luminance.
   float y = dot(c, vec3(0.2126729, 0.7151522, 0.072175));
-  float lo = min(c.r, min(c.g, c.b));
-  if (lo < 0.0) {
-    if (y <= 0.0) c = vec3(0.0);
-    else c = y + (c - y) * (y / (y - lo));
+  if (min(c.r, min(c.g, c.b)) < 0.0) {
+    c = max(c, vec3(0.0));
+    float y2 = dot(c, vec3(0.2126729, 0.7151522, 0.072175));
+    c = y > 0.0 && y2 > 0.0 ? c * (y / y2) : vec3(0.0);
   }
   if (uTone == 0) c = film(c * 1.6);
   else if (uTone == 2) { c = film(c * 1.6); c = c * c * (3.0 - 2.0 * c); }

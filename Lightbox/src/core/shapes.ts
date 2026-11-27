@@ -387,6 +387,6 @@ export function hitCanonical(shape: Shape, planes: Plane[] | null, o: Vec3, d: V
     }
     case 'prism': case 'gem': return hitPolytope(planes ?? [], o, d, tmin);
     case 'lens': return hitLens(shape.r, shape.t, shape.r1, shape.r2, o, d, tmin);
-    case 'mesh': return null; // meshes are intersected through their BVH (see bvh.ts)
+    case 'mesh': return null; // meshes are intersected through their BVH (see mesh.ts)
   }
 }

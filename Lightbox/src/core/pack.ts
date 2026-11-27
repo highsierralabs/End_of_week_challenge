@@ -163,7 +163,7 @@ export function packScene(scene: Scene, meshes: MeshLookup): Packed {
       } else if (o.shape.kind === 'cylinder') {
         side = (2 * o.shape.h) / (2 * o.shape.h + o.shape.r);
       }
-      lightRows.push([i, 0, o.material.lumens, area, fwd[0]!, fwd[1]!, fwd[2]!, fx, fwd[4]!, fwd[5]!, fwd[6]!, fy, fwd[8]!, fwd[9]!, fwd[10]!, side]);
+      lightRows.push([i, mats[mi]![1]!, o.material.lumens, area, fwd[0]!, fwd[1]!, fwd[2]!, fx, fwd[4]!, fwd[5]!, fwd[6]!, fy, fwd[8]!, fwd[9]!, fwd[10]!, side]);
       lumens += o.material.lumens;
     }
     if (isEmitter(o.material) && o.material.lumens > 0) {
@@ -189,15 +189,9 @@ export function packScene(scene: Scene, meshes: MeshLookup): Packed {
     if (traversable) targetList.push(c[0], c[1], c[2], br);
   });
 
-  // Light pick probabilities and their running sum.
-  let acc = 0;
-  for (const l of lightRows) {
-    const p = l[2]! / lumens;
-    acc += p;
-    l[1] = acc;
-    l[2] = p;
-  }
-  if (lightRows.length) lightRows[lightRows.length - 1]![1] = 2;
+  // Each light's share of the total flux; the shader weighs it by the spectrum at the path's
+  // wavelength when it picks a light.
+  for (const l of lightRows) l[2] = l[2]! / lumens;
   const lights = new Float32Array(Math.max(1, lightRows.length) * LIGHT_W * 4);
   lightRows.forEach((l, i) => lights.set(l, i * LIGHT_W * 4));
 

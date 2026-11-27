@@ -47,3 +47,5 @@
 | EOWC-CHG-20261127-012 | Index page plays each build's lead README clip (manifest clip, clipAlt) with the card still for reduced motion; seven kickoff questions in README and index |
 | EOWC-FIX-20261127-013 | Drumhead index clip: a 16:9 crop of play.gif (card-clip.gif) so the header and spectrum labels are not cut off; contract says how to make one |
 | EOWC-CHG-20261127-014 | Lightbox scaffold and engine: fetched optical reference data (CIE observer, NIST lines, Sellmeier glasses, metal indices), spectral core, scene model, exact shapes, WebGL2 path tracer and light tracer with tiled accumulation; unit tests |
+| EOWC-CHG-20261127-015 | Lightbox meshes: binary glTF and OBJ loaders, mesh normalisation, SAH BVH packed for the shader with a mirrored CPU traversal; four models built by a Blender script (wine glass, tumbler, trefoil knot, cat) |
+| EOWC-CHG-20261127-016 | Lightbox app: studio editor (pick, drag, orbit, inspector, lens rings, darkroom, share links, export, own models), seven scenes, twelve-step tour, spectroscope with grating and prism, computed wavelength scale and a mystery-lamp quiz; lights chosen by their emission at each wavelength |

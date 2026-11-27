@@ -26,6 +26,8 @@ export class View {
   /** Tiles traced per animation frame; adapts to keep the page responsive. */
   tilesPerFrame = 1;
   running = false;
+  /** 'average' exposes for the whole picture; 'peak' for its brightest part (a spectrum on black). */
+  meterMode: 'average' | 'peak' = 'average';
   /** The exposure the meter last settled on. */
   autoExposure = 1;
   private metered = -1;
@@ -82,7 +84,7 @@ export class View {
     const due = t.frame >= 1 && (this.metered < 0 || (t.frame < 64 && t.frame >= this.metered * 2));
     if (!due) return;
     const m = t.meter();
-    const target = 0.16 / Math.max(1e-3, Math.exp(m.logMean));
+    const target = this.meterMode === 'peak' ? 0.2 / Math.max(1e-3, m.peak) : 0.16 / Math.max(1e-3, Math.exp(m.logMean));
     this.autoExposure = this.metered < 0 && t.frame < 3 && this.autoExposure !== 1 ? 0.5 * (this.autoExposure + target) : target;
     this.metered = Math.max(1, t.frame);
     this.dirtyDisplay = true;

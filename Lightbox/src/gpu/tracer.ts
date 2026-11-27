@@ -440,9 +440,9 @@ export class Tracer {
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
-  /** Mean log-luminance and mean luminance (cd/m2) of the picture so far. */
-  meter(): { logMean: number; mean: number } {
-    if (!this.accum) return { logMean: 0, mean: 0 };
+  /** Mean log-luminance, mean luminance and the brightest metering cell (cd/m2) so far. */
+  meter(): { logMean: number; mean: number; peak: number } {
+    if (!this.accum) return { logMean: 0, mean: 0, peak: 0 };
     const gl = this.gl;
     gl.bindVertexArray(this.vao);
     gl.disable(gl.SCISSOR_TEST);
@@ -459,9 +459,10 @@ export class Tracer {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     let a = 0;
     let b = 0;
-    for (let i = 0; i < px.length; i += 4) { a += px[i]!; b += px[i + 1]!; }
+    let peak = 0;
+    for (let i = 0; i < px.length; i += 4) { a += px[i]!; b += px[i + 1]!; peak = Math.max(peak, px[i + 1]!); }
     const n = METER_W * METER_H;
-    return { logMean: a / n, mean: b / n };
+    return { logMean: a / n, mean: b / n, peak };
   }
 
   /**

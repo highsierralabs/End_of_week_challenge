@@ -106,6 +106,7 @@ void main() {
   uint pix = pcg(uint(px.x) + pcg(uint(px.y) + 0x1234567u));
   gSeed = pcg(pix ^ pcg(uFrame + 0x9E3779B9u));
   float invPdfLam = sampleWavelength(ld(0, pix));
+  initLights();
 
   vec2 uv = (vec2(px) + vec2(ld(1, pix), ld(2, pix)) - 0.5 * uRes) * (2.0 * uTanHalf / uRes.y);
   vec3 dirP = uCamF + uv.x * uCamR + uv.y * uCamU;
@@ -194,7 +195,7 @@ void main() {
     } else {
       if (dot(wo, ns) <= 0.0) ns = ng;
       // ---- next-event estimation: one light, one shadow ray
-      if (uNumLights > 0) {
+      if (gLightSum > 0.0) {
         float pick;
         int l = pickLight(rnd(), pick);
         vec4 L0 = lightTexel(l, 0);
@@ -334,7 +335,8 @@ void main() {
   ivec2 px = ivec2(gl_FragCoord.xy);
   gSeed = pcg(uint(px.x) + pcg(uint(px.y) + pcg(uFrame ^ 0xABCDEF1u)));
   float invPdfLam = sampleWavelength(rnd());
-  if (uNumLights == 0 || uNumTargets == 0) return;
+  initLights();
+  if (uNumTargets == 0 || !(gLightSum > 0.0)) return;
 
   // ---- emit a photon
   float pick;
