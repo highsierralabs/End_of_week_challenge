@@ -16,7 +16,7 @@ import { DEFAULT_TUNING, LiveDrum, type Tuning } from './live';
 import { formatNote } from './notes';
 import { Quiz } from './quiz';
 import { decodeOutline, encodeOutline } from './share';
-import type { DrumData, SolveJob, SolveReply, SolveRequest } from './worker';
+import type { DrumData, Material, SolveJob, SolveReply, SolveRequest } from './worker';
 
 type Mode = 'play' | 'draw' | 'sand' | 'listen';
 
@@ -40,6 +40,7 @@ const small = Math.min(screen.width, screen.height) < 700 || (navigator.hardware
 const DETAIL = Number(params.get('detail')) || (small ? 1900 : 2600);
 const MODES = Math.min(160, Number(params.get('modes')) || (small ? 72 : 96));
 const AUDIO_GAIN = 0.07;
+const PLATE_GAIN = 1.9;
 const TWINS = 'twins';
 
 // ---------------------------------------------------------------- DOM
@@ -67,6 +68,7 @@ app.innerHTML = `
       <div class="dh-group dh-shapes" role="group" aria-label="Shapes"></div>
       <span class="dh-sep"></span>
       <div class="dh-group">
+        <button class="dh-btn" data-act="plate" title="Metal plate with free edges instead of a drumhead (T)" aria-pressed="false"><span>Metal</span></button>
         <button class="dh-btn" data-act="modes" title="Mode shapes (M)"><span>Modes</span></button>
         <button class="dh-btn" data-act="sound" title="Sound settings" aria-expanded="false"><span>Sound</span></button>
         <button class="dh-btn" data-act="share" title="Copy a link to this drum"><span>Share</span></button>
@@ -186,25 +188,31 @@ function solveOn(w: Worker, req: SolveJob, onProgress: (f: number) => void): Pro
 /** Solved presets, kept: shapes and frequencies do not depend on the tuning. */
 const cache = new Map<string, Promise<DrumData>>();
 let rr = 0;
-function getDrum(id: string, onProgress: (f: number) => void = () => {}): Promise<DrumData> {
-  let p = cache.get(id);
+function getDrum(id: string, onProgress: (f: number) => void = () => {}, mat: Material = 'membrane'): Promise<DrumData> {
+  const key = `${id}|${mat}`;
+  let p = cache.get(key);
   if (!p) {
-    p = solveOn(workers[rr++ % workers.length]!, { kind: 'preset', preset: id, detail: DETAIL, modes: MODES }, onProgress);
-    p.catch(() => cache.delete(id));
-    cache.set(id, p);
+    p = solveOn(workers[rr++ % workers.length]!, { kind: 'preset', preset: id, detail: DETAIL, modes: MODES, material: mat }, onProgress);
+    p.catch(() => cache.delete(key));
+    cache.set(key, p);
   }
   return p;
 }
+/** Drumhead (membrane, clamped rim) or metal plate (free edges). */
+let material: Material = params.get('material') === 'plate' ? 'plate' : 'membrane';
+/** What is on the stage, so the material switch can re-solve it. */
+let shown: string | Poly = 'circle';
 
 let loadToken = 0;
 async function load(what: string | Poly): Promise<void> {
   const token = ++loadToken;
   const twins = what === TWINS;
+  const mat = material;
   const reqs: SolveJob[] = twins
-    ? [{ kind: 'preset', preset: 'gww-left', detail: DETAIL, modes: MODES }, { kind: 'preset', preset: 'gww-right', detail: DETAIL, modes: MODES }]
+    ? [{ kind: 'preset', preset: 'gww-left', detail: DETAIL, modes: MODES, material: mat }, { kind: 'preset', preset: 'gww-right', detail: DETAIL, modes: MODES, material: mat }]
     : typeof what === 'string'
-      ? [{ kind: 'preset', preset: what, detail: DETAIL, modes: MODES }]
-      : [{ kind: 'poly', poly: what, detail: DETAIL, modes: MODES }];
+      ? [{ kind: 'preset', preset: what, detail: DETAIL, modes: MODES, material: mat }]
+      : [{ kind: 'poly', poly: what, detail: DETAIL, modes: MODES, material: mat }];
   const prog = reqs.map(() => 0);
   const show = () => { busyEl.textContent = `Tuning the drum… ${Math.round((100 * prog.reduce((a, b) => a + b, 0)) / prog.length)}%`; };
   busyEl.classList.remove('is-error');
@@ -213,7 +221,7 @@ async function load(what: string | Poly): Promise<void> {
   try {
     const data = await Promise.all(reqs.map((r, i) => {
       const progress = (f: number) => { prog[i] = f; show(); };
-      return r.kind === 'preset' ? getDrum(r.preset, progress) : solveOn(workers[i]!, r, progress);
+      return r.kind === 'preset' ? getDrum(r.preset, progress, mat) : solveOn(workers[i]!, r, progress);
     }));
     if (token !== loadToken) return;
     for (const s of slots) s.gl.dispose();
@@ -231,8 +239,10 @@ async function load(what: string | Poly): Promise<void> {
     });
     slots.forEach((s, i) => sendBank(s, i));
     current = typeof what === 'string' ? what : '';
+    shown = typeof what === 'string' ? what : data[0]!.outline;
     {
       const u = new URL(location.href);
+      if (mat === 'plate') u.searchParams.set('material', 'plate'); else u.searchParams.delete('material');
       if (typeof what === 'string') { u.searchParams.set('shape', what); u.searchParams.delete('d'); }
       else { u.searchParams.delete('shape'); u.searchParams.set('d', encodeOutline(data[0]!.outline)); }
       history.replaceState(null, '', u);
@@ -261,10 +271,12 @@ async function load(what: string | Poly): Promise<void> {
 
 function defaultDrive(live: LiveDrum): [number, number] {
   // Off-centre, so that most modes are excited: the first point inside along a spiral.
+  // A plate is driven at its centre instead, as Chladni plates usually are.
   const d = live.data;
   let cx = 0, cy = 0;
   for (let i = 0; i < d.nv; i++) { cx += d.xy[2 * i]!; cy += d.xy[2 * i + 1]!; }
   cx /= d.nv; cy /= d.nv;
+  if (d.material === 'plate' && live.inside(cx, cy)) return [cx, cy];
   const R = Math.sqrt(d.area);
   for (let t = 0; t < 60; t++) {
     const r = R * (0.21 - t * 0.003), a = 0.7 + t * 0.9;
@@ -340,6 +352,26 @@ function updateCard(): void {
   const ratios = distinct.map((r) => r.toFixed(2)).join(', ');
   const d = a.data;
   const circle = (tuning.speed * Math.sqrt(discFundamental(d.area))) / (2 * Math.PI);
+  const plate = d.material === 'plate';
+  if (plate) {
+    let html = `<h2>${twins ? 'The twins, in metal' : `${slots[0]!.name}, in metal`}</h2>
+    <p class="dh-note">A stiff plate with free edges: the kind Chladni bowed and sprinkled with sand.</p>
+    <dl>
+      <dt>Fundamental</dt><dd>${f1.toFixed(1)} Hz, ${formatNote(f1)}</dd>
+      <dt>Overtones</dt><dd>&times; ${ratios}&hellip;</dd>
+      <dt>Area</dt><dd>${d.area.toFixed(3)} m&sup2;</dd>
+    </dl>`;
+    if (twins) {
+      const b = slots[1]!.live;
+      let worst = 0;
+      for (let k = 0; k < Math.min(a.data.count, b.data.count, 12); k++) worst = Math.max(worst, Math.abs(a.freqs[k]! - b.freqs[k]!) / a.freqs[k]!);
+      html += `<p class="dh-small">As plates the twins are <span class="dh-warm">no longer twins</span>: among the first 12 modes their frequencies differ by up to ${(worst * 100).toFixed(0)}%. Gordon, Webb and Wolpert's proof is for membranes held at the rim.</p>`;
+    } else {
+      html += `<p class="dh-small">Plate frequencies grow with the square of the mode's wavenumber, not linearly as a drum's do, so the overtones spread wide and the plate rings like a gong or bell.</p>`;
+    }
+    cardEl.innerHTML = html;
+    return;
+  }
   let html = `<h2>${twins ? 'The twins' : slots[0]!.name}</h2>
     <p class="dh-note">${twins ? 'Two different drums with exactly the same frequencies (Gordon, Webb and Wolpert, 1992).' : slots[0]!.note}</p>
     <dl>
@@ -368,6 +400,7 @@ function setHint(): void {
     ? 'Draw a closed shape in one stroke. Lift to make it a drum.'
     : mode === 'sand'
       ? 'Drag along the notes below to sweep the drive. Tap the plate to move the driver.'
+      : material === 'plate' ? 'Strike the plate. Then try Sand: this is what Chladni saw.'
       : slots.length === 2 ? 'Same notes, different shapes. Tap either drum.' : 'Tap the drum. Draw your own with “Draw”.';
 }
 
@@ -420,6 +453,13 @@ function stepSweep(dt: number): void {
     // Next distinct pitch (skip the partner of a degenerate pair).
     let k = sweep.k + 1;
     while (k < fr.length && fr[k]! / target < 1.004) k++;
+    // Skip modes the driver cannot excite (it sits on their nodal line): they would draw nothing.
+    const phi = slots[0]!.live.shapesAt(slots[0]!.drive[0], slots[0]!.drive[1]);
+    if (phi) {
+      let big = 0;
+      for (let q = 0; q < Math.min(phi.length, SWEEP_MODES); q++) big = Math.max(big, Math.abs(phi[q]!));
+      while (k < Math.min(fr.length, SWEEP_MODES) && Math.abs(phi[k]!) < 0.08 * big) k++;
+    }
     if (k >= Math.min(fr.length, SWEEP_MODES)) k = 0;
     sweep = { k, t: 0, from: target };
   }
@@ -493,7 +533,9 @@ function strike(i: number, x: number, y: number, vel: number): void {
   void audio.start();
   const amps = s.live.strikeAmps(x, y, vel, tuning);
   if (!amps) return;
-  const a = amps.map((v) => v * AUDIO_GAIN);
+  // A plate spreads a strike over far more widely spaced modes; lift it to a drum's loudness.
+  const g = AUDIO_GAIN * (s.live.data.material === 'plate' ? PLATE_GAIN : 1);
+  const a = amps.map((v) => v * g);
   audio.send({ type: 'strike', id: i, amps: a, click: 0.05 * vel * Math.min(1, tuning.mallet / 1500), cutoff: tuning.mallet * 3 });
   s.live.kick(amps);
   ink.ripples.push({ view: s.view, x, y, t0: performance.now(), v: vel });
@@ -612,6 +654,7 @@ app.addEventListener('click', (e) => {
   else if (b.dataset.close !== undefined) (b.closest('dialog') as HTMLDialogElement).close();
   else if (b.dataset.act === 'about') aboutDlg.showModal();
   else if (b.dataset.act === 'sweep') setSweep(!sweep);
+  else if (b.dataset.act === 'plate') setMaterial(material === 'plate' ? 'membrane' : 'plate');
   else if (b.dataset.act === 'share') {
     const label = b.querySelector('span')!;
     const done = (t: string) => { label.textContent = t; setTimeout(() => { label.textContent = 'Share'; }, 2200); };
@@ -668,6 +711,7 @@ window.addEventListener('keydown', (e) => {
   else if (k === 'd') setMode('draw');
   else if (k === 's') setMode('sand');
   else if (k === 'l') setMode('listen');
+  else if (k === 't') setMaterial(material === 'plate' ? 'membrane' : 'plate');
   else if (k === 'w' && mode === 'sand') setSweep(!sweep);
   else if (k === 'm') { fillGallery(); galleryDlg.showModal(); }
   else if (k === 'a') aboutDlg.showModal();
@@ -681,6 +725,13 @@ window.addEventListener('keydown', (e) => {
     for (const s of slots) s.ampDirty = true;
   }
 });
+
+function setMaterial(m: Material): void {
+  material = m;
+  app.querySelector('[data-act="plate"]')!.setAttribute('aria-pressed', String(m === 'plate'));
+  if (mode === 'listen') setMode('play');
+  void load(shown);
+}
 
 // ---------------------------------------------------------------- gallery
 
@@ -791,7 +842,7 @@ async function renderOffline(seconds = 2, slot = 0): Promise<{ peak: number; rms
   const sr = 48000;
   const ctx = new OfflineAudioContext(2, Math.round(seconds * sr), sr);
   await ctx.audioWorklet.addModule(workletUrl);
-  const amps = s.live.strikeAmps(s.drive[0], s.drive[1], 0.85, tuning)!.map((v) => v * AUDIO_GAIN);
+  const amps = s.live.strikeAmps(s.drive[0], s.drive[1], 0.85, tuning)!.map((v) => v * AUDIO_GAIN * (s.live.data.material === 'plate' ? PLATE_GAIN : 1));
   const node = new AudioWorkletNode(ctx, 'modal-bank', {
     numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2],
     processorOptions: { init: [{ type: 'bank', id: 0, freqs: s.live.freqs, decays: s.live.decays, pan: 0 }, { type: 'strike', id: 0, amps, click: 0.04, cutoff: 2700 }] },
@@ -810,7 +861,7 @@ async function renderOffline(seconds = 2, slot = 0): Promise<{ peak: number; rms
   setMode,
   strike: (i: number, x: number, y: number) => strike(i, x, y, 0.85),
   state: () => ({
-    mode, current, driveF, levels: slots.map((s) => s.level), drives: slots.map((s) => s.drive), drums: slots.map((s) => ({ name: s.name, nv: s.live.data.nv, modes: s.live.data.count, f1: s.live.fundamental, ms: s.live.data.ms, area: s.live.data.area, heard: s.live.data.heard, lambda: Array.from(s.live.data.lambda) })),
+    mode, current, material, driveF, levels: slots.map((s) => s.level), drives: slots.map((s) => s.drive), drums: slots.map((s) => ({ material: s.live.data.material, name: s.name, nv: s.live.data.nv, modes: s.live.data.count, f1: s.live.fundamental, ms: s.live.data.ms, area: s.live.data.area, heard: s.live.data.heard, lambda: Array.from(s.live.data.lambda) })),
   }),
   setDrive: (f: number) => { driveF = f; for (const s of slots) s.ampDirty = true; },
   quiz: () => quiz.state,
@@ -821,6 +872,7 @@ syncSliders();
 {
   const m = params.get('mode');
   setMode(m === 'sand' || m === 'listen' ? m : 'play');
+  app.querySelector('[data-act="plate"]')!.setAttribute('aria-pressed', String(material === 'plate'));
 }
 layout();
 const startShape = params.get('shape');

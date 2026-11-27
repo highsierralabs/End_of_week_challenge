@@ -2,12 +2,14 @@
 
 import { circle, gwwMesh, PRESETS } from '../solver/shapes';
 import { latticeMesh, refineTriangles } from '../solver/mesh';
+import { solvePlate } from '../solver/plate';
 import { hearShape, solveDrum } from '../solver/spectrum';
 
 export type VMsg =
   | { type: 'square'; rows: { label: string; exact: number; got: number }[]; nv: number }
   | { type: 'disc'; rows: { label: string; exact: number; got: number }[]; nv: number }
   | { type: 'gww'; level: number; h: number; nv: number; left: number[]; right: number[]; ms: number }
+  | { type: 'plate'; lambda: number[]; ms: number }
   | { type: 'weyl'; rows: { name: string; area: number; heardArea: number; perimeter: number; heardPerimeter: number }[] }
   | { type: 'done' };
 
@@ -35,6 +37,13 @@ self.onmessage = () => {
     const a = solveDrum(gwwMesh('left', 1, level), 25);
     const b = solveDrum(gwwMesh('right', 1, level), 25);
     post({ type: 'gww', level, h: 2 / 2 ** level, nv: a.mesh.xy.length / 2, left: Array.from(a.lambda), right: Array.from(b.lambda), ms: performance.now() - t0 });
+  }
+  // The free square plate (Ritz), nu = 0.225, against Porter (2017).
+  {
+    const t0 = performance.now();
+    const sq = refineTriangles([[-1, -1, 1, -1, 1, 1], [-1, -1, 1, 1, -1, 1]], 4, [-1, -1, 1, -1, 1, 1, -1, 1]);
+    const p = solvePlate(sq, sq, 16, 0.225, 10);
+    post({ type: 'plate', lambda: Array.from(p.lambda), ms: performance.now() - t0 });
   }
   // Weyl's law on every preset, at the size the app uses.
   {

@@ -42,3 +42,4 @@
 | EOWC-CHG-20261127-007 | Drumhead validation page: Driscoll comparison and convergence, twins agreement per refinement, square and disc exact values, Weyl on every preset, all computed live; smoke covers it |
 | EOWC-DOC-20261127-008 | Drumhead README, screenshots, animated clips and clip recorder; layout avoids the info card; Weyl accuracy stated as measured |
 | EOWC-FIX-20261127-009 | Drumhead review fixes: worker handler leaked onto the page, NaN drive from rim taps, pitch slider in sand mode, stroke lost on load, degenerate share links, quiz race, Lanczos restart for repeated eigenvalues |
+| EOWC-CHG-20261127-010 | Drumhead Metal: free-edged Kirchhoff plates by a Legendre Ritz method, true Chladni figures, plate sound; validated against Porter (2017); sweep skips modes the driver cannot excite |

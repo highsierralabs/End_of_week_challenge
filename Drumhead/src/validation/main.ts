@@ -1,7 +1,7 @@
 // Drumhead validation page: the solver's checks, re-run in the visitor's browser.
 
 import './validation.css';
-import { DRISCOLL_GWW } from '../solver/reference';
+import { DRISCOLL_GWW, FREE_SQUARE_PLATE } from '../solver/reference';
 import type { VMsg } from './worker';
 
 const RED = '#bd3b26';
@@ -60,6 +60,17 @@ root.innerHTML = `
     within about 5% and the perimeter within about 15%; the perimeter is the harder of the two to hear, because its
     term grows only as &radic;&lambda;.</p>
     <div class="v-scroll"><table class="v-weyl"><thead><tr><th>Drum</th><th>Area</th><th>Heard</th><th>Error</th><th>Perimeter</th><th>Heard</th><th>Error</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section id="v-plate">
+    <h2>5. The metal plates</h2>
+    <p>With <em>Metal</em> on, a shape becomes a stiff plate with free edges, which obeys the biharmonic equation
+    D&nabla;<sup>4</sup>w = &rho;<sub>s</sub>&omega;&sup2;w. Its modes come from a Ritz method: products of Legendre
+    polynomials up to total degree 14 (16 here), integrated over the shape's own triangles. A free square plate
+    has no closed-form answer either. The reference is R. Porter's 2017 computation (University of Bristol, Table 1,
+    Poisson's ratio 0.225), whose own values were still settling in the fourth digit between its two finest
+    resolutions.</p>
+    <div class="v-scroll"><table class="v-plate"><thead><tr><th>Mode</th><th>Porter (2017), &lambda;a<sup>4</sup></th><th>Drumhead</th><th>Difference</th></tr></thead><tbody></tbody></table></div>
   </section>
 
   <footer><p>Source, tests and notes: <a href="https://github.com/highsierralabs/End_of_week_challenge/tree/main/Drumhead" target="_blank" rel="noopener">End_of_week_challenge/Drumhead</a>.
@@ -142,7 +153,9 @@ worker.onmessage = (ev: MessageEvent<VMsg>) => {
   if (m.type === 'square') { exactRows('.v-sq', m.rows); $('.v-sq-n').textContent = `(${m.nv.toLocaleString('en-US')} vertices)`; }
   else if (m.type === 'disc') { exactRows('.v-disc', m.rows); $('.v-disc-n').textContent = `(${m.nv.toLocaleString('en-US')} vertices)`; }
   else if (m.type === 'gww') { gww.push(m); gwwTable(); }
-  else if (m.type === 'weyl') {
+  else if (m.type === 'plate') {
+    $('.v-plate tbody').innerHTML = FREE_SQUARE_PLATE.map((e, i) => `<tr><td>${i + 1}</td><td>${e.toFixed(4)}</td><td>${m.lambda[i]!.toFixed(4)}</td><td>${pct(rel(m.lambda[i]!, e))}</td></tr>`).join('');
+  } else if (m.type === 'weyl') {
     $('.v-weyl tbody').innerHTML = m.rows.map((r) => `<tr><td>${r.name}</td><td>${r.area.toFixed(4)} m&sup2;</td><td>${r.heardArea.toFixed(4)}</td><td>${pct(rel(r.heardArea, r.area))}</td><td>${r.perimeter.toFixed(3)} m</td><td>${r.heardPerimeter.toFixed(3)}</td><td>${pct(rel(r.heardPerimeter, r.perimeter))}</td></tr>`).join('');
   } else if (m.type === 'done') {
     $('.v-status').textContent = 'All computed.';

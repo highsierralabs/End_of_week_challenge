@@ -12,3 +12,12 @@ export const DRISCOLL_GWW = [
   20.8823950433, 21.2480051774, 22.2328517930, 23.7112974848, 24.4792340693,
   24.6740110027, 26.0802400997, 27.3040189211, 28.1751285815, 29.5697729132,
 ];
+
+/**
+ * The lowest nonzero eigenvalues lambda a^4 (lambda = rho_s d omega^2 / D) of a completely free square plate
+ * [-a, a]^2 with Poisson's ratio 0.225, in ascending order across the four symmetry classes (the pairs are
+ * the degenerate SA/AS modes). From "Eigenfrequencies and eigenmodes for a thin rectangular elastic plate with
+ * free edges", R. Porter, School of Mathematics, University of Bristol, technical report, April 2017,
+ * Table 1, N = 48 column.
+ */
+export const FREE_SQUARE_PLATE = [12.4552, 25.9900, 35.6495, 80.9341, 80.9341, 235.500, 235.500, 269.437, 320.969, 375.420];

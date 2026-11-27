@@ -17,6 +17,13 @@ export const DEFAULT_TUNING: Tuning = { speed: 100, sustain: 1.6, mallet: 900 };
 
 /** Seconds of on-screen motion per second of real vibration, as a fraction: the fundamental shows at about 0.8 Hz. */
 const VIS_FUNDAMENTAL_HZ = 0.8;
+/** On-screen frequencies are capped at this multiple of the fundamental so fast modes do not alias at 60 frames/s. */
+const VIS_MAX_RATIO = 9;
+/**
+ * Plates: the Pitch slider's wave speed c (m/s) becomes sqrt(D / rho_s) = c * PLATE_LENGTH (m^2/s). With the
+ * default c this puts a 66 cm plate near 200 Hz: a notional thick metal plate rather than a measured one.
+ */
+export const PLATE_LENGTH = 0.255;
 const VIS_SUSTAIN_STRETCH = 2.2;
 
 export class LiveDrum {
@@ -51,15 +58,17 @@ export class LiveDrum {
     this.decays = new Float32Array(n);
     this.visW = new Float32Array(n);
     this.visR = new Float32Array(n);
+    const plate = this.data.material === 'plate';
     for (let k = 0; k < n; k++) {
-      const f = (t.speed * Math.sqrt(this.data.lambda[k]!)) / (2 * Math.PI);
+      // Membrane: omega = c sqrt(lambda). Plate: omega = sqrt(D / rho_s) sqrt(lambda), lambda in 1/m^4.
+      const f = ((plate ? t.speed * PLATE_LENGTH : t.speed) * Math.sqrt(this.data.lambda[k]!)) / (2 * Math.PI);
       this.freqs[k] = f;
-      // Air and internal losses grow with frequency.
-      this.decays[k] = t.sustain / (1 + f / 450);
+      // Air and internal losses grow with frequency; metal rings far longer than skin.
+      this.decays[k] = plate ? (2.5 * t.sustain) / (1 + f / 1500) : t.sustain / (1 + f / 450);
     }
     const f1 = this.freqs[0]!;
     for (let k = 0; k < n; k++) {
-      this.visW[k] = 2 * Math.PI * VIS_FUNDAMENTAL_HZ * (this.freqs[k]! / f1);
+      this.visW[k] = 2 * Math.PI * VIS_FUNDAMENTAL_HZ * Math.min(VIS_MAX_RATIO, this.freqs[k]! / f1);
       this.visR[k] = 1 / (this.decays[k]! * VIS_SUSTAIN_STRETCH);
     }
   }

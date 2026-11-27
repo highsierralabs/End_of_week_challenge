@@ -27,6 +27,10 @@ tapped, and you hear the sum.
 - **The twins.** Two drums of different shapes, from Gordon, Webb and Wolpert's 1992 answer to Kac: *no*. They have
   the same frequencies. Drumhead computes each twin separately, and their 96 frequencies agree to about 6 parts in
   10<sup>15</sup>, which is rounding error. The **Modes** view shows the same pitch arising from different patterns.
+- **Metal.** One switch turns any shape into a stiff metal plate with free edges, the kind Chladni really used.
+  It rings like a gong, and with the plate driven at its centre, Sand draws Chladni's own figures. The twins stop
+  being twins: as free plates their frequencies differ by tens of per cent, because the proof needs a membrane held
+  at its rim.
 - **Listen.** A hidden drum is struck and you pick its shape from three. Sometimes two of the three are the twins,
   and then either answer counts, because nobody could tell them apart.
 - **Read the card.** For every drum the card gives the fundamental and its note, the overtone ratios, and the area and
@@ -37,6 +41,8 @@ tapped, and you hear the sum.
 ![The twins, struck: the same frequencies from two different shapes, each built from seven identical triangles](docs/screenshots/twins.gif)
 
 ![Sand mode sweeping a circular drum through its modes: the grains run to the nodal lines of each resonance in turn](docs/screenshots/sand.gif)
+
+![A free square metal plate driven at its centre: the sand has settled into a classic Chladni figure, four lobes around a central diamond](docs/screenshots/chladni.png)
 
 ![The Modes view for the twins: each pair is the same mode number on Twin A and Twin B, with different patterns and identical frequencies](docs/screenshots/modes.png)
 
@@ -63,7 +69,12 @@ tapped, and you hear the sum.
 6. **Sand.** The steady response to a drive at frequency f is Σₖ φₖ(x₀) φₖ(x) / (fₖ² − f² + i g f fₖ). Each grain
    hops by an amount proportional to the local amplitude, so the grains drain out of the moving regions and collect
    where the plate stands still.
-7. **Hearing the shape.** Weyl's law with the perimeter term, N(λ) ≈ Aλ/4π − P√λ/4π + 1/6, is fitted to the first
+7. **Plates.** A free plate obeys D∇⁴w = ρₛω²w with no conditions to impose at its edges. Drumhead uses a Ritz
+   method: products of Legendre polynomials up to total degree 14, with the bending and kinetic energies
+   integrated over a 1,000-vertex mesh of the shape (7 points per triangle). The three rigid-body modes are dropped,
+   and the rest are drawn on the full mesh. Plate frequencies grow with the square of the wavenumber, so the
+   overtones spread wide. *Pitch* sets the bending stiffness, so the plate's thickness is notional.
+8. **Hearing the shape.** Weyl's law with the perimeter term, N(λ) ≈ Aλ/4π − P√λ/4π + 1/6, is fitted to the first
    48 eigenvalues to estimate A and P.
 
 ## How far to trust it
@@ -79,6 +90,7 @@ this in the visitor's browser. The figures below are from one run of it on 27 No
 | Unit square, first 10 modes vs π²(m² + n²), 4,225 vertices | within 0.31% |
 | Unit disc, first 6 modes vs Bessel zeros, lattice mesh, 5,995 vertices | within 0.15% |
 | Weyl's law on the 10 presets: heard area, heard perimeter | area within 4.4%, perimeter within 14% |
+| Free square plate (Ritz, degree 16), first 10 modes vs Porter (2017), ν = 0.225 | within 0.09% |
 
 ![The validation page: a log-log chart of the error in modes 1 and 9 as the mesh is refined, and the start of the Driscoll table](docs/screenshots/validation.png)
 
@@ -98,8 +110,10 @@ pull in opposite directions. The page says so rather than claiming the textbook 
   timpani or tom.
 - The damping model is chosen to sound plausible, not measured from a real drum.
 - The higher of the 96 modes are less accurate than the low ones, because fewer triangles span each wave.
-- Chladni's plates were stiff and free-edged, which is a different equation. The sand here sits on the clamped
-  membrane.
+- In drum mode the sand sits on the clamped membrane, which is not the equation Chladni's stiff free plates obey.
+  *Metal* is the faithful version. Its plates are ideal Kirchhoff plates: thin, uniform, with Poisson's ratio 0.3.
+- The plate's Ritz basis spans its bounding square. On shapes with deep re-entrant corners (the star, the L, the
+  twins) its convergence is slower than on convex ones, and only the square is checked against published values.
 - A freehand loop that crosses itself is filled even-odd, and only its largest piece becomes the drum.
 - The audio was checked by measurement, not by ear: offline renders of a strike are finite, peak at about 0.5 and are
   never clipped. How it sounds is your call.
@@ -118,19 +132,19 @@ npm run smoke        # serves dist/ under /drumhead/ and drives it in GPU Chromi
 ```
 
 URL options: `?shape=circle|square|triangle|ell|stadium|guitar|star|heart|twins`, `?mode=sand|listen`,
-`?d=<outline>` (a shared drawing), `?detail=<vertices>`, `?modes=<count>`. Keys: **P**lay, **D**raw, **S**and,
-**L**isten, **M**odes, **A**bout, **W** sweeps in sand mode, **H** hides the interface, space strikes again.
+`?d=<outline>` (a shared drawing), `?material=plate`, `?detail=<vertices>`, `?modes=<count>`. Keys: **P**lay, **D**raw, **S**and,
+**L**isten, me**T**al, **M**odes, **A**bout, **W** sweeps in sand mode, **H** hides the interface, space strikes again.
 
 ## Layout
 
 | Path | What it is |
 |---|---|
-| `src/solver/` | Pure and deterministic: geometry, meshing, FEM assembly, RCM banded Cholesky, Lanczos, presets, Driscoll's table |
+| `src/solver/` | Pure and deterministic: geometry, meshing, FEM assembly, RCM banded Cholesky, Lanczos, the Ritz plate solver, presets, reference values |
 | `src/app/` | The page: controller, worker, live drum (tuning, strikes, Chladni response), quiz, share codec, About text |
 | `src/render/` | WebGL2 stage, ink overlay, sand, raster point location, spectrum strip |
 | `src/audio/` | AudioWorklet resonator bank and the audio engine |
 | `src/validation/` | The validation page and its worker |
-| `tests/unit/` | Vitest: solver accuracy, isospectrality, Weyl, share links |
+| `tests/unit/` | Vitest: solver accuracy, isospectrality, Weyl, free plates, share links |
 | `scripts/` | `smoke.mjs` (gate member), `shot.mjs` and `clip.mjs` (README images) |
 
 ## References
@@ -145,6 +159,8 @@ URL options: `?shape=circle|square|triangle|ell|stadium|guitar|star|heart|twins`
 - P. Buser, J. Conway, P. Doyle, K. Semmler, "Some planar isospectral domains", *International Mathematics Research
   Notices* (1994) 391-400.
 - E. F. F. Chladni, *Entdeckungen über die Theorie des Klanges* (1787).
+- R. Porter, "Eigenfrequencies and eigenmodes for a thin rectangular elastic plate with free edges", technical
+  report, School of Mathematics, University of Bristol (2017). Table 1 supplies the free square plate reference.
 
 Made for the [End of week challenge](../README.md), week 2, by Claude Code working on its own. MIT licence (see the
 repository's [LICENSE](../LICENSE)). Drumhead ships no third-party code or assets: no libraries, fonts or images. The

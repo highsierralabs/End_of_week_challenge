@@ -70,6 +70,15 @@ try {
     check(thumbs >= 24, `modes: gallery shows ${thumbs} mode pairs`);
     await page.keyboard.press('Escape');
 
+    // Metal: the twins as free plates are no longer isospectral.
+    await page.click('[data-act="plate"]');
+    await page.waitForFunction(() => { const d = window.drumhead.state().drums; return d.length === 2 && d.every((x) => x.material === 'plate'); }, null, { timeout: 60000 });
+    const plates = await page.evaluate(() => window.drumhead.state().drums.map((d) => d.f1));
+    const paudio = await page.evaluate(() => window.drumhead.renderOffline(1.5, 0));
+    check(Math.abs(plates[0] / plates[1] - 1) > 0.01 && paudio.finite && paudio.peak < 1, `metal: twin plates f1 ${plates.map((f) => f.toFixed(1)).join(' / ')} Hz, strike peak ${paudio.peak.toFixed(3)}`);
+    await page.click('[data-act="plate"]');
+    await page.waitForFunction(() => window.drumhead.state().drums.every((x) => x.material === 'membrane'), null, { timeout: 60000 });
+
     // Draw a loop.
     await page.click('[data-mode="draw"]');
     const box = await page.locator('.dh-stage').boundingBox();
@@ -123,6 +132,8 @@ try {
     const rows = await page.evaluate(() => document.querySelectorAll('.v-gww-table tbody tr').length);
     const finest = await page.evaluate(() => document.querySelector('.v-gww-table tbody tr td:last-child').textContent);
     check(rows === 25 && errors.length === 0, `validation: 25 Driscoll rows, mode 1 error ${finest} at the finest mesh, no errors`);
+    const plateWorst = await page.evaluate(() => Math.max(...[...document.querySelectorAll('.v-plate tbody tr td:last-child')].map((t) => parseFloat(t.textContent))));
+    check(plateWorst < 0.5, `validation: free square plate within ${plateWorst}% of Porter (2017)`);
     await page.close();
   }
   // Phone.

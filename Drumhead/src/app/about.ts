@@ -40,6 +40,19 @@ so the grains drain into the places that stay still. Sweep the frequency along t
 stirs, and as you pass each mode it runs into that mode's figure. Chladni's plates were stiff plates with free edges,
 which obey a different equation. Here it is the membrane clamped at its rim, but the idea is the same.</p>
 
+<h3>Metal</h3>
+<p>The <em>Metal</em> switch turns the shape into a stiff metal plate with free edges, the kind Chladni actually used. A
+plate resists bending rather than stretching, so it obeys a fourth-order equation, and its frequencies grow with the
+square of a mode's wavenumber. The overtones spread wide, and it rings like a gong. With the plate driven at its
+centre, Sand draws the figures Chladni drew. The twins stop being twins here: the transplantation proof needs a
+membrane held at its rim, and as free plates their frequencies differ by tens of per cent. The plate's thickness is
+notional: <em>Pitch</em> sets its bending stiffness, so the plate sounds at a playable pitch rather than one computed
+from a real sheet.</p>
+<p>Plate modes come from a Ritz method rather than finite elements. The shape's deflection is written as a sum of
+products of Legendre polynomials, and the bending and kinetic energies are integrated over the shape's own triangles.
+Free edges then need no special treatment. For a free square plate the result is within 0.1% of published
+values.</p>
+
 <h3>How it works</h3>
 <ol>
 <li>The shape is filled with a mesh of a few thousand triangles. Freehand shapes use an equilateral lattice whose
