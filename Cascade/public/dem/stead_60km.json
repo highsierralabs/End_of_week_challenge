@@ -1,0 +1,37 @@
+{
+  "name": "stead_60km",
+  "size_m": 60000,
+  "pixels": 2048,
+  "cell_m": 29.296875,
+  "origin": {
+    "lat": 39.66,
+    "lon": -119.865,
+    "note": "illustrative valley-floor point, not an observatory location"
+  },
+  "elevation_m": {
+    "min": 1157.73,
+    "max": 3015.87,
+    "at_origin": 1526.58,
+    "min_at_en_m": [
+      29663,
+      26089
+    ],
+    "max_at_en_m": [
+      -5991,
+      -29985
+    ]
+  },
+  "encoding": "terrarium: elevation_m = R*256 + G + B/256 - 32768 (quantised to 1/4 m); alpha 255",
+  "layout": "row 0 = north edge, column 0 = west edge; pixel centres at east = -size/2 + (i+0.5)*cell, north = size/2 - (j+0.5)*cell",
+  "projection": "local equirectangular about the origin (east = dlon * m_per_deg_lon, north = dlat * m_per_deg_lat)",
+  "m_per_deg": {
+    "lat": 111028.07784841677,
+    "lon": 85815.95367450855
+  },
+  "source": {
+    "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
+    "zoom": 12,
+    "tiles": 81
+  },
+  "attribution": "Elevation: Terrain Tiles (Mapzen / Linux Foundation) via the AWS Open Data Registry, https://registry.opendata.aws/terrain-tiles/ . Contains data from USGS 3DEP (3D Elevation Program, public domain) and other sources credited at https://github.com/tilezen/joerd/blob/master/docs/attribution.md"
+}
