@@ -5,7 +5,7 @@ import { AudioEngine } from '../audio/engine';
 import workletUrl from '../audio/modal.worklet.ts?worker&url';
 import { Ink } from '../render/ink';
 import { Sand } from '../render/sand';
-import { DrumGL, screenToWorld, Stage, type DrawItem, type View } from '../render/stage';
+import { DrumGL, screenToWorld, Stage, worldToScreen, type DrawItem, type View } from '../render/stage';
 import { Strip, type StripRow } from '../render/strip';
 import { polyArea, type Poly } from '../solver/geometry';
 import { GWW, GWW_SCALE, PRESETS, scalePoly } from '../solver/shapes';
@@ -241,10 +241,10 @@ async function load(what: string | Poly): Promise<void> {
     driveF = slots[0]!.live.freqs[Math.min(4, slots[0]!.live.data.count - 1)]!;
     highlight = -1;
     lastStrike = null;
+    updateCard();
     layout();
     if (mode === 'sand') enterSand();
     if (mode === 'draw') setMode('play');
-    updateCard();
     if (galleryDlg.open) fillGallery();
     busyEl.classList.remove('is-on');
     (window as unknown as { drumhead: Record<string, unknown> }).drumhead.ready = true;
@@ -284,15 +284,16 @@ function layout(): void {
   ink.resize(r.width, r.height, dpr);
   const sb = $<HTMLCanvasElement>('.dh-strip').parentElement!.getBoundingClientRect();
   strip.resize(sb.width, parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--strip-h')) || 66, dpr);
-  const n = Math.max(1, slots.length);
-  const W = r.width, H = r.height;
-  const pad = 0.96;
-  if (n === 1) {
-    const side = Math.min(W, H) * pad;
-    const v = { x: (W - side) / 2, y: (H - side) / 2, w: side, h: side };
-    if (slots[0]) slots[0].view.rect = v;
-    drawView.rect = v;
-  } else {
+  const H = r.height;
+  const place = (W: number) => {
+    const n = Math.max(1, slots.length);
+    const pad = 0.96;
+    const side1 = Math.min(W, H) * pad;
+    drawView.rect = { x: (W - side1) / 2, y: (H - side1) / 2, w: side1, h: side1 };
+    if (n === 1) {
+      if (slots[0]) slots[0].view.rect = { ...drawView.rect };
+      return;
+    }
     const across = Math.min(W / 2, H), down = Math.min(W, H / 2);
     const side = Math.max(across, down) * pad;
     slots.forEach((s, i) => {
@@ -300,8 +301,22 @@ function layout(): void {
         ? { x: W / 2 + (i ? 0 : -side) + (i ? 1 : -1) * (W / 4 - side / 2), y: (H - side) / 2, w: side, h: side }
         : { x: (W - side) / 2, y: H / 2 + (i ? 0 : -side) + (i ? 1 : -1) * (H / 4 - side / 2), w: side, h: side };
     });
-    const side1 = Math.min(W, H) * pad;
-    drawView.rect = { x: (W - side1) / 2, y: (H - side1) / 2, w: side1, h: side1 };
+  };
+  place(r.width);
+  // On wide screens the card floats top-right over the stage: if a drum would run under it,
+  // lay the drums out in the space to its left instead.
+  if (getComputedStyle(cardEl).position === 'absolute' && !cardEl.hidden) {
+    const c = cardEl.getBoundingClientRect();
+    const cx = c.left - r.left, cb = c.bottom - r.top;
+    const hits = slots.some((s) => {
+      const o = s.live.data.outline;
+      for (let i = 0; i < o.length; i += 2) {
+        const [sx, sy] = worldToScreen(s.view, o[i]!, o[i + 1]!);
+        if (sx > cx - 8 && sy < cb + 8) return true;
+      }
+      return false;
+    });
+    if (hits) place(cx - 12);
   }
 }
 const drawView: View = { rect: { x: 0, y: 0, w: 1, h: 1 } };
@@ -359,6 +374,7 @@ function setMode(m: Mode): void {
   if (mode === 'sand' && m !== 'sand') audio.send({ type: 'drive', freq: driveF, gain: 0 });
   if (m === 'listen') void quiz.open(); else quiz.close();
   cardEl.hidden = m === 'listen';
+  if (slots.length) layout();
   sweepBtn.hidden = m !== 'sand';
   if (m !== 'sand') setSweep(false);
   mode = m;

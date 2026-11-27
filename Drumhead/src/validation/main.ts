@@ -56,8 +56,9 @@ root.innerHTML = `
     <p>The card beside each drum fits Weyl's law, <i>N</i>(&lambda;) &asymp; <i>A</i>&lambda;/4&pi;
     &minus; <i>P</i>&radic;&lambda;/4&pi; + 1/6, to the first 48 eigenvalues and reports the area <i>A</i> and the
     perimeter <i>P</i> it hears. Here is how close that gets for every preset, at the size the app uses. The 1/6 is
-    exact only for smooth outlines, and the higher modes of a mesh this coarse run slightly sharp, so a few per cent
-    is the honest expectation.</p>
+    exact only for smooth outlines, and the higher modes of a mesh this coarse run slightly sharp. Expect the area
+    within about 5% and the perimeter within about 15%; the perimeter is the harder of the two to hear, because its
+    term grows only as &radic;&lambda;.</p>
     <div class="v-scroll"><table class="v-weyl"><thead><tr><th>Drum</th><th>Area</th><th>Heard</th><th>Error</th><th>Perimeter</th><th>Heard</th><th>Error</th></tr></thead><tbody></tbody></table></div>
   </section>
 
