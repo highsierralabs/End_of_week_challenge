@@ -4,7 +4,7 @@ One autonomous build, made with Claude Code in the last hours of a weekly subscr
 
 ## [Cascade](Cascade/): cosmic-ray air showers over the high desert
 
-![Cascade](Cascade/docs/screenshots/hero.png)
+![Cascade: a 1 PeV proton shower replayed over Lemmon Valley, Nevada](Cascade/docs/screenshots/shower.gif)
 
 An interactive Monte Carlo of cosmic-ray air showers that runs in the browser. Showers are replayed in 3D on WebGPU,
 with a WebGL2 fallback, over real terrain north of Reno, Nevada. The simulator is validated against standard

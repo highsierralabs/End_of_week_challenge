@@ -2,7 +2,7 @@
 
 **A cosmic-ray air shower, simulated particle by particle in your browser and replayed in 3D over the Nevada high desert.**
 
-![A 1 PeV proton shower over Lemmon Valley, seen from the side](docs/screenshots/hero.png)
+![A 1 PeV proton shower over Lemmon Valley, replayed from the side: the primary (orange) comes in, the shower front sweeps down at the speed of light, and the ground lights up where particles land](docs/screenshots/shower.gif)
 
 Live: **https://highsierralabs.github.io/End_of_week_challenge/** · Validation: [validation.html](https://highsierralabs.github.io/End_of_week_challenge/validation.html)
 
@@ -39,7 +39,7 @@ the observatory's own measurements.
 
 ![The app: controls, readout, charts and the replay timeline](docs/screenshots/app.png)
 
-![Sky mode: about 100 microseconds of real cosmic-ray showers over the Reno-Stead area](docs/screenshots/sky.png)
+![Sky mode: about 100 microseconds of real cosmic-ray showers falling on the Reno-Stead area](docs/screenshots/sky.gif)
 
 ## The physics, briefly
 
