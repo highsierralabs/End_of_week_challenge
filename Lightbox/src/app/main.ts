@@ -1,6 +1,7 @@
 // Lightbox: the app shell. Builds the page, wires the view, the editor state, the panels and
 // the three modes (studio, tour, spectroscope), and handles sharing and export.
 import './style.css';
+import { boundCentre } from '../core/pack';
 import { SCENES, sceneById } from '../core/scenes';
 import type { Scene } from '../core/scene';
 import { compactScene, fromBase64Url, sanitizeScene, toBase64Url } from '../core/share';
@@ -25,6 +26,8 @@ declare global {
       setMode: (m: Mode) => Promise<void>;
       /** For scripts: 'scene:<id>' loads a built-in scene, 'tour:<n>' opens a tour step. */
       go: (what: string) => Promise<void>;
+      /** For scripts: where an object's centre appears in the picture, in CSS pixels of the page. */
+      pointOf: (id: string) => { x: number; y: number } | null;
       state: () => unknown;
     };
   }
@@ -313,7 +316,13 @@ function start(): void {
       const [kind, arg] = what.split(':');
       if (kind === 'tour') { await setMode('tour'); await tour.go(Number(arg)); } else { await setMode('studio'); const e = sceneById(arg ?? ''); if (e) { sceneSelect.value = e.id; await loadScene(e.make()); } }
     },
-    state: () => ({ mode, frame: view.tracer.frame, photons: view.tracer.photons, size: [view.tracer.width, view.tracer.height], objects: store.scene?.objects.length ?? 0, selected: store.selectedId, scene: store.scene?.name }),
+    pointOf: (id) => {
+      const o = store.scene.objects.find((x) => x.id === id);
+      const p = o && interaction.project(boundCentre(o));
+      const r = canvas.getBoundingClientRect();
+      return p ? { x: r.left + p.x, y: r.top + p.y } : null;
+    },
+    state: () => ({ mode, frame: view.tracer.frame, photons: view.tracer.photons, size: [view.tracer.width, view.tracer.height], objects: store.scene?.objects.length ?? 0, selected: store.selectedId, scene: store.scene?.name, tourStep: tour.step, canUndo: store.canUndo }),
   };
 
   status.textContent = 'Compiling shaders…';

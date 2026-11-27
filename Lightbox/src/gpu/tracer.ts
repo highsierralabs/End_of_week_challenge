@@ -219,6 +219,12 @@ export class Tracer {
     this.reset();
   }
 
+  /** Change the work tile's size; the current sweep starts over (pixels keep their own counts). */
+  setTileSize(size: number): void {
+    this.tileSize = Math.max(32, Math.round(size));
+    this.cursor = 0;
+  }
+
   /** Forget the accumulated picture and start again. */
   reset(): void {
     this.frame = 0;
@@ -252,6 +258,8 @@ export class Tracer {
     p.i('uNumLights', s.numLights);
     p.i('uNumTargets', s.numTargets);
     p.i('uMaxBounces', this.maxBounces);
+    p.i('uPathIters', 2 * this.maxBounces + 8);
+    p.i('uBvhIters', 4096);
     p.f('uEnvScale', s.envScale);
     p.i('uEnvRow', s.envRow);
     p.v2('uRes', this.rw, this.rh);

@@ -34,6 +34,10 @@ export class View {
   private lastTime = 0;
   private raf = 0;
   private dirtyDisplay = true;
+  private slowFrames = 0;
+
+  /** True when the GPU needs several animation frames for one sample of the picture. */
+  get slow(): boolean { return this.tracer.tileSize < 256 || this.tilesPerFrame < this.tracer.tilesPerSweep * 0.5; }
 
   constructor(readonly canvas: HTMLCanvasElement) {
     this.tracer = new Tracer(canvas);
@@ -99,6 +103,9 @@ export class View {
     const done = this.maxSamples > 0 && t.frame >= this.maxSamples;
     if (!done) {
       if (dt > 45) this.tilesPerFrame = Math.max(1, this.tilesPerFrame * 0.6);
+      // A single tile that takes several frames makes the page sluggish: use smaller tiles.
+      this.slowFrames = dt > 70 && this.tilesPerFrame <= 1 ? this.slowFrames + 1 : 0;
+      if (this.slowFrames >= 3 && t.tileSize > 64) { t.setTileSize(t.tileSize / 2); this.slowFrames = 0; }
       else if (dt < 24) this.tilesPerFrame = Math.min(t.tilesPerSweep * 16, this.tilesPerFrame * 1.25 + 0.25);
       let n = Math.max(1, Math.floor(this.tilesPerFrame));
       if (this.maxSamples > 0) n = Math.min(n, (this.maxSamples - t.frame) * t.tilesPerSweep);

@@ -68,6 +68,8 @@ export class Interaction {
   /** Drop to a coarse preview while the visitor is dragging; sharpen again when they stop. */
   private busy(): void {
     const t = this.store.view.tracer;
+    // Slow GPUs get a coarser preview so that dragging stays fluid.
+    if (t.scale === 1) this.previewScale = this.store.view.slow ? 4 : 2;
     if (t.scale !== this.previewScale) t.setScale(this.previewScale);
     clearTimeout(this.idleTimer);
     this.idleTimer = window.setTimeout(() => { if (this.mode === 'none') t.setScale(1); else this.busy(); }, PREVIEW_SCALE_IDLE_MS);

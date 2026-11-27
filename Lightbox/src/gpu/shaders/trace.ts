@@ -139,7 +139,7 @@ void main() {
   float scontrib = 0.0;
   int sskip = -1;
 
-  for (int it = 0; it < 160; it++) {
+  for (int it = 0; it < uPathIters; it++) {
     bool isShadow = shadow;
     if (!isShadow && !alive) break;
     Hit h;
@@ -398,7 +398,7 @@ void main() {
   float cmax = 0.0;
   vec3 cval = vec3(0.0);
   vec2 cpix = vec2(0.0);
-  for (int it = 0; it < 100; it++) {
+  for (int it = 0; it < uPathIters; it++) {
     Hit h;
     bool found = intersectScene(connect ? cro : ro, connect ? crd : rd, connect ? cmax : INF, connect, -1, h);
     if (connect) {

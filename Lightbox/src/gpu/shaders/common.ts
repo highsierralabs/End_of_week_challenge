@@ -61,6 +61,10 @@ uniform int uNumObj;
 uniform int uNumLights;
 uniform int uNumTargets;
 uniform int uMaxBounces;
+// Loop limits arrive as uniforms so that no compiler tries to unroll the path loop or the BVH
+// walk (some desktop OpenGL drivers do, and take minutes or lose the context).
+uniform int uPathIters;
+uniform int uBvhIters;
 uniform float uEnvScale;
 uniform int uEnvRow;
 
@@ -323,7 +327,7 @@ void hitMesh(vec3 o, vec3 d, int root, bool anyHit, inout float bt, inout vec3 b
   int node = root;
   int bestTri = -1;
   vec2 bestUv = vec2(0.0);
-  for (int guard = 0; guard < 4096; guard++) {
+  for (int guard = 0; guard < uBvhIters; guard++) {
     vec4 A = bvhTexel(node * 2);
     vec4 B = bvhTexel(node * 2 + 1);
     vec3 ta = (A.xyz - o) * inv;
