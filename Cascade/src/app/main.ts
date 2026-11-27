@@ -11,6 +11,7 @@ import { Stage, type CameraPreset } from '../render/stage';
 import { createObservatory } from '../ui/observatory';
 import { renderDetector } from '../ui/detectorCard';
 import { detectorExposure } from '../physics/detector';
+import { Sonifier } from '../audio/sonify';
 
 const q = new URLSearchParams(location.search);
 const layout = buildLayout(document.getElementById('app')!);
@@ -84,6 +85,17 @@ const tour = createTour(layout.overlay, {
 });
 const about = createAbout(layout.overlay);
 const observatory = createObservatory(layout.overlay);
+const sound = new Sonifier();
+const soundBtn = document.createElement('button');
+soundBtn.type = 'button';
+soundBtn.className = 'cx-btn cx-sound';
+soundBtn.setAttribute('aria-pressed', 'false');
+soundBtn.title = 'Sonify the replay: a click for every ground arrival (S)';
+const setSoundLabel = (): void => { soundBtn.textContent = sound.enabled ? 'Sound on' : 'Sound off'; soundBtn.setAttribute('aria-pressed', String(sound.enabled)); };
+const toggleSound = async (): Promise<void> => { if (sound.enabled) sound.disable(); else await sound.enable(); setSoundLabel(); };
+soundBtn.addEventListener('click', () => void toggleSound());
+setSoundLabel();
+layout.overlay.append(soundBtn);
 if (q.has('data')) setTimeout(() => observatory.open(), 300);
 
 async function run(p: ShowerParams, camera?: string, play = true): Promise<void> {
@@ -97,6 +109,7 @@ async function run(p: ShowerParams, camera?: string, play = true): Promise<void>
     controls.setBusy(null);
     result = r;
     stage?.load(r);
+    sound.load(r);
     charts.update(r);
     renderStats(layout.stats, r);
     renderDetector(layout.stats.querySelector('.cx-panel-body') ?? layout.stats, detectorExposure(r));
@@ -140,6 +153,10 @@ async function start(): Promise<void> {
       if (tNs >= result.stats.tMax) { tNs = result.stats.tMax; playing = false; }
       pushTime();
     }
+    if (result) {
+      const st0 = result.stats;
+      sound.update(tNs, (tNs - st0.tMin) / Math.max(1, st0.tCore - st0.tMin), playing);
+    }
     st.render(dt, tNs);
   });
 }
@@ -150,6 +167,7 @@ window.addEventListener('keydown', (e) => {
   const t = e.target as HTMLElement | null;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
   if (e.key === 'h' || e.key === 'H') document.documentElement.classList.toggle('cx-clean');
+  if (e.key === 's' || e.key === 'S') void toggleSound();
 });
 
 void start();
