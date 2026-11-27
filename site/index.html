@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="End of week challenge: one build a week, made by Claude Code working on its own with whatever is left of the week's subscription." />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0c0d10" />
+    <title>End of week challenge</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c0d10'/%3E%3Cpath d='M8 22 A8 8 0 1 1 24 22' stroke='%23f0a840' stroke-width='2.2' fill='none' stroke-linecap='round'/%3E%3Cpath d='M16 22 L21 13' stroke='%23f0a840' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E" />
+    <style>
+      :root {
+        --bg: #0c0d10;
+        --panel: #14161b;
+        --line: #262932;
+        --text: #e9e6df;
+        --muted: #9a978f;
+        --accent: #f0a840;
+        --accent-ink: #1a1203;
+        --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+        --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, "Liberation Mono", monospace;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #f6f3ec;
+          --panel: #fffdf8;
+          --line: #ddd7c9;
+          --text: #1c1b18;
+          --muted: #6a665c;
+          --accent: #a85f00;
+          --accent-ink: #fffdf8;
+        }
+      }
+      * { box-sizing: border-box; }
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 17px/1.6 var(--sans);
+      }
+      a { color: inherit; }
+      a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 0 max(24px, env(safe-area-inset-right)) 0 max(24px, env(safe-area-inset-left));
+      }
+
+      header { padding: clamp(48px, 10vw, 112px) 0 clamp(32px, 6vw, 64px); }
+      .eyebrow {
+        margin: 0 0 20px;
+        font: 13px/1 var(--mono);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      h1 {
+        margin: 0;
+        font: 400 clamp(40px, 8vw, 84px)/1.02 var(--serif);
+        letter-spacing: -0.02em;
+      }
+      .lede {
+        max-width: 38em;
+        margin: 28px 0 0;
+        font-size: clamp(17px, 2.1vw, 20px);
+        color: var(--muted);
+      }
+      .lede strong { color: var(--text); font-weight: 500; }
+
+      .count {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px 0;
+        border-top: 1px solid var(--line);
+        font: 13px/1.4 var(--mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .entry {
+        display: grid;
+        grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+        gap: clamp(24px, 4vw, 48px);
+        align-items: center;
+        padding: clamp(28px, 5vw, 56px) 0;
+        border-top: 1px solid var(--line);
+      }
+      .shot {
+        display: block;
+        aspect-ratio: 16 / 9;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--panel);
+      }
+      .shot img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.5s ease;
+      }
+      .shot:hover img { transform: scale(1.03); }
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 18px;
+        margin: 0 0 14px;
+        font: 13px/1.4 var(--mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .meta .no { color: var(--accent); }
+      h2 {
+        margin: 0;
+        font: 400 clamp(32px, 4.6vw, 48px)/1.08 var(--serif);
+        letter-spacing: -0.015em;
+      }
+      h2 a { text-decoration: none; }
+      h2 a:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 6px; }
+      .tagline { margin: 8px 0 0; font-size: 19px; }
+      .summary { margin: 16px 0 0; color: var(--muted); }
+      .tech {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 20px 0 0;
+        padding: 0;
+        list-style: none;
+        font: 12px/1 var(--mono);
+        letter-spacing: 0.04em;
+      }
+      .tech li { padding: 6px 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); }
+      .links { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; margin: 26px 0 0; }
+      .open {
+        display: inline-block;
+        padding: 11px 18px;
+        border-radius: 6px;
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 600;
+        text-decoration: none;
+      }
+      .open:hover { filter: brightness(1.08); }
+      .links a:not(.open) { color: var(--muted); text-underline-offset: 4px; }
+      .links a:not(.open):hover { color: var(--text); }
+
+      footer {
+        margin-top: clamp(24px, 5vw, 56px);
+        padding: 24px 0 48px;
+        border-top: 1px solid var(--line);
+        font-size: 14px;
+        color: var(--muted);
+      }
+      footer p { margin: 0 0 6px; }
+      footer a { text-underline-offset: 4px; }
+      footer a:hover { color: var(--text); }
+
+      @media (max-width: 760px) {
+        .entry { grid-template-columns: minmax(0, 1fr); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .shot img { transition: none; }
+        .shot:hover img { transform: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <p class="eyebrow">High Sierra Labs</p>
+        <h1>End of week challenge</h1>
+        <p class="lede">
+          A Claude Code subscription resets every Friday morning. Whatever is left of the week's allowance before then
+          goes into <strong>one build that Claude picks, designs and ships on its own</strong>: five questions at the
+          start, then no further direction.
+        </p>
+      </header>
+
+      <main>
+        <p class="count"><span>The builds</span><span><!-- COUNT --></span></p>
+<!-- CHALLENGES -->
+      </main>
+
+      <footer>
+        <p>
+          <a href="<!-- REPO -->">Source on GitHub</a> &middot; <a href="LICENSE">MIT licence</a> &middot;
+          <a href="THIRD-PARTY-NOTICES.md">Third-party notices</a>
+        </p>
+        <p>Built with Claude Code. Each build's commits carry the session that made them.</p>
+      </footer>
+    </div>
+  </body>
+</html>

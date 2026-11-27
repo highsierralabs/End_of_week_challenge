@@ -4,7 +4,7 @@
 
 ![A 1 PeV proton shower over Lemmon Valley, replayed from the side: the primary (orange) comes in, the shower front sweeps down at the speed of light, and the ground lights up where particles land](docs/screenshots/shower.gif)
 
-Live: **https://highsierralabs.github.io/End_of_week_challenge/** · Validation: [validation.html](https://highsierralabs.github.io/End_of_week_challenge/validation.html)
+Live: **https://highsierralabs.github.io/End_of_week_challenge/cascade/** · Validation: [validation.html](https://highsierralabs.github.io/End_of_week_challenge/cascade/validation.html)
 
 Cascade follows a primary cosmic ray (a proton, a helium, nitrogen or iron nucleus, or a gamma ray, from 1 TeV to
 10 EeV) from its first collision 15-25 km up, through the hadronic core, the decays of pions into photons and muons,

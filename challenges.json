@@ -1,0 +1,16 @@
+{
+  "challenges": [
+    {
+      "slug": "cascade",
+      "dir": "Cascade",
+      "title": "Cascade",
+      "tagline": "Cosmic-ray air showers over the high desert",
+      "summary": "An interactive Monte Carlo of cosmic-ray air showers that runs in the browser. Showers are tracked particle by particle, then replayed in 3D over real terrain north of Reno, Nevada, and compared with a citizen observatory's own measurements.",
+      "date": "2026-11-27",
+      "image": "Cascade/docs/screenshots/card.jpg",
+      "imageAlt": "A 1 PeV proton shower striking the ground under a night sky",
+      "tech": ["WebGPU", "WebGL2 fallback", "three.js", "TypeScript"],
+      "tag": "cascade-v1.0.0"
+    }
+  ]
+}

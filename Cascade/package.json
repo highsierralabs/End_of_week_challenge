@@ -4,7 +4,7 @@
   "private": true,
   "description": "Cascade: an interactive cosmic-ray air shower simulator over the Nevada high desert. WebGPU with a WebGL2 fallback.",
   "license": "MIT",
-  "homepage": "https://highsierralabs.github.io/End_of_week_challenge/",
+  "homepage": "https://highsierralabs.github.io/End_of_week_challenge/cascade/",
   "type": "module",
   "engines": {
     "node": ">=24.14.1 <25"

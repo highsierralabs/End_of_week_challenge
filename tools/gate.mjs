@@ -2,15 +2,18 @@
 //          "Gate command"): one PASS/FAIL verdict over its member checks.
 // USAGE:   node tools/gate.mjs [--range <rev-range>] [--allow-dirty] [--no-smoke]
 // OUTPUT:  one ASCII line per member and a final tuple line, e.g.
-//          gate: check=PASS build=PASS msgs=PASS public=PASS clean=PASS -> PASS
+//          gate: check=PASS build=PASS smoke=PASS site=PASS msgs=PASS public=PASS clean=PASS -> PASS
 //          Exit 0 on PASS, 1 on FAIL.
 // VERSION HISTORY:
 //   1.0  2026-11-26  Initial release: check, build, commit-message audit, public-safety scan, clean tree.
 //   1.1  2026-11-26  Smoke member: the production build in GPU Chromium on both backends.
+//   1.2  2026-11-27  Check, build and smoke run for every challenge in challenges.json; site member
+//                    assembles the Pages site with tools/build-site.mjs.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { checkMessage } from './check-commit-msg.mjs';
+import { loadManifest } from './build-site.mjs';
 
 const root = join(import.meta.dirname, '..');
 const args = process.argv.slice(2);
@@ -18,21 +21,35 @@ const range = args.includes('--range') ? args[args.indexOf('--range') + 1] : 'HE
 const allowDirty = args.includes('--allow-dirty');
 const results = {};
 
-function run(name, cmd, cmdArgs, cwd) {
+// A member covers every challenge: it passes only when each one passes.
+function run(name, label, cmd, cmdArgs, cwd) {
   const r = spawnSync(cmd, cmdArgs, { cwd, encoding: 'utf8', shell: process.platform === 'win32' });
-  results[name] = r.status === 0 ? 'PASS' : 'FAIL';
-  if (r.status !== 0) console.log(`${name}: FAIL\n${(r.stdout + r.stderr).split('\n').slice(-25).join('\n')}`);
-  else console.log(`${name}: PASS`);
+  if (r.status !== 0) {
+    results[name] = 'FAIL';
+    console.log(`${name}: FAIL (${label})\n${(r.stdout + r.stderr).split('\n').slice(-25).join('\n')}`);
+  } else {
+    results[name] ??= 'PASS';
+    console.log(`${name}: PASS (${label})`);
+  }
 }
 
 const git = (...a) => execFileSync('git', a, { cwd: root, encoding: 'utf8' });
 
-// 1-2: project checks and production build.
-run('check', 'npm', ['run', 'check'], join(root, 'Cascade'));
-run('build', 'npm', ['run', 'build'], join(root, 'Cascade'));
-// 2b: the built site boots and runs on WebGPU and WebGL2 (needs a GPU; --no-smoke skips it).
-if (args.includes('--no-smoke')) { results.smoke = 'SKIP'; console.log('smoke: SKIP'); }
-else run('smoke', 'npm', ['run', 'smoke'], join(root, 'Cascade'));
+// 1-2: each challenge's own checks, production build and smoke test (its package.json scripts).
+// The smoke tests need a GPU; --no-smoke skips them.
+let challenges = [];
+try { challenges = loadManifest().challenges; } catch (e) { results.check = 'FAIL'; console.log(`check: FAIL\n${e.message}`); }
+const noSmoke = args.includes('--no-smoke');
+if (noSmoke) { results.smoke = 'SKIP'; console.log('smoke: SKIP'); }
+for (const c of challenges.filter((x) => x.npm)) {
+  const dir = join(root, c.dir);
+  const scripts = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).scripts ?? {};
+  run('check', c.slug, 'npm', ['run', 'check'], dir);
+  run('build', c.slug, 'npm', ['run', 'build'], dir);
+  if (!noSmoke && scripts.smoke) run('smoke', c.slug, 'npm', ['run', 'smoke'], dir);
+}
+// 2b: the Pages site assembles from those builds and every link on the index resolves.
+run('site', 'all', 'node', ['tools/build-site.mjs', '--skip-build'], root);
 
 // 3: every commit message in range follows the grammar.
 {

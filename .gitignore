@@ -1,5 +1,6 @@
 node_modules/
 dist/
+_site/
 shots/
 test-results/
 .cache/
