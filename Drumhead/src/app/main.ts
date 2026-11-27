@@ -14,9 +14,10 @@ import { ABOUT_HTML } from './about';
 import { modeThumb } from './gallery';
 import { DEFAULT_TUNING, LiveDrum, type Tuning } from './live';
 import { formatNote } from './notes';
+import { Quiz } from './quiz';
 import { type DrumData, type SolveJob, type SolveReply, type SolveRequest } from './worker';
 
-type Mode = 'play' | 'draw' | 'sand';
+type Mode = 'play' | 'draw' | 'sand' | 'listen';
 
 interface Slot {
   live: LiveDrum;
@@ -58,6 +59,7 @@ app.innerHTML = `
         <button class="dh-btn" data-mode="play" title="Play (P)">${icon('play')}<span class="dh-label">Play</span></button>
         <button class="dh-btn" data-mode="draw" title="Draw a drum (D)">${icon('draw')}<span class="dh-label">Draw</span></button>
         <button class="dh-btn" data-mode="sand" title="Sand (S)">${icon('sand')}<span class="dh-label">Sand</span></button>
+        <button class="dh-btn" data-mode="listen" title="Which drum? A listening game (L)">${icon('ear')}<span class="dh-label">Listen</span></button>
       </div>
       <span class="dh-sep"></span>
       <div class="dh-group dh-shapes" role="group" aria-label="Shapes"></div>
@@ -87,6 +89,7 @@ function icon(name: string): string {
     case 'draw': return s('<path d="M4 20c2-1 3-4 6-4s3 3 6 2 3-6 1-9-6-4-8-2"/><circle cx="9" cy="7" r="1"/>');
     case 'sand': return s('<circle cx="6" cy="7" r=".8"/><circle cx="12" cy="5" r=".8"/><circle cx="17" cy="8" r=".8"/><circle cx="8" cy="12" r=".8"/><circle cx="15" cy="13" r=".8"/><path d="M3 18c3-2 6-2 9 0s6 2 9 0"/>');
     case 'speaker': return s('<path d="M4 9h4l5-4v14l-5-4H4z"/><path class="dh-wave" d="M16 9c1.5 1.5 1.5 4.5 0 6M18.5 6.5c3 3 3 8 0 11"/>');
+    case 'ear': return s('<path d="M7 9a5 5 0 0 1 10 0c0 3-3 4-3 7a3 3 0 0 1-5.5 1.6"/><path d="M10 9.5a2 2 0 0 1 4 0c0 1.2-1 1.6-1.6 2.4"/>');
     case 'muted': return s('<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9l5 6M22 9l-5 6"/>');
     default: return '';
   }
@@ -133,6 +136,18 @@ const ink = new Ink($<HTMLCanvasElement>('.dh-ink'));
 const strip = new Strip($<HTMLCanvasElement>('.dh-strip'));
 const audio = new AudioEngine();
 
+const quiz = new Quiz(stageEl, {
+  getDrum: (id) => getDrum(id),
+  strike: (bank, live, x, y) => {
+    void audio.start();
+    const amps = live.strikeAmps(x, y, 0.85, tuning);
+    if (amps) audio.send({ type: 'strike', id: bank, amps: amps.map((v) => v * AUDIO_GAIN), click: 0.04, cutoff: tuning.mallet * 3 });
+  },
+  sendBank: (bank, live) => audio.send({ type: 'bank', id: bank, freqs: live.freqs, decays: live.decays, pan: 0 }),
+  tuning: () => tuning,
+  shapeIcon,
+});
+
 let mode: Mode = 'play';
 let slots: Slot[] = [];
 let current = '';
@@ -165,6 +180,19 @@ function solveOn(w: Worker, req: SolveJob, onProgress: (f: number) => void): Pro
   });
 }
 
+/** Solved presets, kept: shapes and frequencies do not depend on the tuning. */
+const cache = new Map<string, Promise<DrumData>>();
+let rr = 0;
+function getDrum(id: string, onProgress: (f: number) => void = () => {}): Promise<DrumData> {
+  let p = cache.get(id);
+  if (!p) {
+    p = solveOn(workers[rr++ % workers.length]!, { kind: 'preset', preset: id, detail: DETAIL, modes: MODES }, onProgress);
+    p.catch(() => cache.delete(id));
+    cache.set(id, p);
+  }
+  return p;
+}
+
 let loadToken = 0;
 async function load(what: string | Poly): Promise<void> {
   const token = ++loadToken;
@@ -180,7 +208,10 @@ async function load(what: string | Poly): Promise<void> {
   busyEl.classList.add('is-on');
   show();
   try {
-    const data = await Promise.all(reqs.map((r, i) => solveOn(workers[i]!, r, (f) => { prog[i] = f; show(); })));
+    const data = await Promise.all(reqs.map((r, i) => {
+      const progress = (f: number) => { prog[i] = f; show(); };
+      return r.kind === 'preset' ? getDrum(r.preset, progress) : solveOn(workers[i]!, r, progress);
+    }));
     if (token !== loadToken) return;
     for (const s of slots) s.gl.dispose();
     audio.send({ type: 'stop' });
@@ -309,7 +340,9 @@ function updateCard(): void {
 }
 
 function setHint(): void {
-  hintEl.textContent = mode === 'draw'
+  hintEl.textContent = mode === 'listen'
+    ? 'Can you hear the shape of a drum? Listen, then pick one.'
+    : mode === 'draw'
     ? 'Draw a closed shape in one stroke. Lift to make it a drum.'
     : mode === 'sand'
       ? 'Drag along the notes below to sweep the drive. Tap the plate to move the driver.'
@@ -320,6 +353,8 @@ function setHint(): void {
 
 function setMode(m: Mode): void {
   if (mode === 'sand' && m !== 'sand') audio.send({ type: 'drive', freq: driveF, gain: 0 });
+  if (m === 'listen') void quiz.open(); else quiz.close();
+  cardEl.hidden = m === 'listen';
   mode = m;
   stageEl.className = `dh-stage is-${m}`;
   for (const b of app.querySelectorAll<HTMLButtonElement>('[data-mode]')) b.setAttribute('aria-pressed', String(b.dataset.mode === m));
@@ -426,6 +461,7 @@ stageEl.addEventListener('pointerdown', (e) => {
     stroke = [x, y];
     return;
   }
+  if (mode === 'listen') return;
   const hit = slotAt(sx, sy);
   if (!hit) return;
   if (mode === 'sand') {
@@ -507,7 +543,7 @@ app.addEventListener('click', (e) => {
   const b = (e.target as Element).closest<HTMLButtonElement>('button');
   if (!b) return;
   if (b.dataset.mode) setMode(b.dataset.mode as Mode);
-  else if (b.dataset.shape) { if (mode === 'draw') setMode('play'); void load(b.dataset.shape); }
+  else if (b.dataset.shape) { if (mode === 'draw' || mode === 'listen') setMode('play'); void load(b.dataset.shape); }
   else if (b.dataset.close !== undefined) (b.closest('dialog') as HTMLDialogElement).close();
   else if (b.dataset.act === 'about') aboutDlg.showModal();
   else if (b.dataset.act === 'modes') { fillGallery(); galleryDlg.showModal(); }
@@ -552,6 +588,7 @@ window.addEventListener('keydown', (e) => {
   if (k === 'p') setMode('play');
   else if (k === 'd') setMode('draw');
   else if (k === 's') setMode('sand');
+  else if (k === 'l') setMode('listen');
   else if (k === 'm') { fillGallery(); galleryDlg.showModal(); }
   else if (k === 'a') aboutDlg.showModal();
   else if (k === 'h') { hideUi = !hideUi; for (const el of [cardEl, $('.dh-head'), $('.dh-bottom')]) (el as HTMLElement).style.visibility = hideUi ? 'hidden' : ''; }
@@ -605,8 +642,9 @@ function frame(now: number): void {
   lastT = now;
   const items: DrawItem[] = [];
   const rows: StripRow[] = [];
-  for (let i = 0; i < slots.length; i++) {
-    const s = slots[i]!;
+  const shown = mode === 'listen' ? [] : slots;
+  for (let i = 0; i < shown.length; i++) {
+    const s = shown[i]!;
     const lv = new Float32Array(s.live.data.count);
     if (mode === 'sand' && s.sand) {
       if (s.ampDirty) {
@@ -635,13 +673,14 @@ function frame(now: number): void {
   }
   stage.draw(items);
   ink.clear();
-  for (const s of slots) ink.rim(s.view, s.live.data.outline, mode === 'sand');
-  if (mode === 'sand') for (const s of slots) ink.driver(s.view, s.drive[0], s.drive[1]);
-  if (slots.length === 2) slots.forEach((s, i) => ink.caption(s.view, i ? 'Twin B' : 'Twin A'));
+  for (const s of shown) ink.rim(s.view, s.live.data.outline, mode === 'sand');
+  if (mode === 'sand') for (const s of shown) ink.driver(s.view, s.drive[0], s.drive[1]);
+  if (shown.length === 2) shown.forEach((s, i) => ink.caption(s.view, i ? 'Twin B' : 'Twin A'));
   ink.drawRipples(now);
   if (stroke && strokeView) ink.stroke(strokeView, stroke);
 
-  if (slots.length) {
+  if (mode === 'listen') strip.state = null;
+  else if (slots.length) {
     const f0 = slots[0]!.live.freqs;
     const lo = f0[0]! / 1.35, hi = f0[f0.length - 1]! * 1.08;
     const firstStrip = !strip.state;
@@ -686,11 +725,15 @@ async function renderOffline(seconds = 2, slot = 0): Promise<{ peak: number; rms
     mode, current, driveF, drums: slots.map((s) => ({ name: s.name, nv: s.live.data.nv, modes: s.live.data.count, f1: s.live.fundamental, ms: s.live.data.ms, area: s.live.data.area, heard: s.live.data.heard, lambda: Array.from(s.live.data.lambda) })),
   }),
   setDrive: (f: number) => { driveF = f; for (const s of slots) s.ampDirty = true; },
+  quiz: () => quiz.state,
   renderOffline,
 };
 
 syncSliders();
-setMode((params.get('mode') as Mode) === 'sand' ? 'sand' : 'play');
+{
+  const m = params.get('mode');
+  setMode(m === 'sand' || m === 'listen' ? m : 'play');
+}
 layout();
 const startShape = params.get('shape');
 void load(startShape && (startShape === TWINS || PRESETS.some((p) => p.id === startShape)) ? startShape : 'circle').then(syncSliders);
