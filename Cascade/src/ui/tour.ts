@@ -93,6 +93,21 @@ export const TOUR: TourStep[] = [
     chart: 'profile',
   },
   {
+    id: 'telescope',
+    title: 'Watching Xmax from 18 km away',
+    body: `<p>How do observatories measure X<sub>max</sub>? On clear moonless nights the shower's charged particles make
+      the nitrogen in the air glow faintly in the near-ultraviolet. Fluorescence telescopes, like the 27 "eyes" of the
+      Pierre Auger Observatory in Argentina, watch that light cross a camera of hexagonal pixels in a few tens of
+      microseconds.</p>
+      <p>The light along the track traces the longitudinal profile, and the timing of the pixels fixes the shower's
+      geometry. The Telescope tab shows what an eye 18 km from this shower would record. The model is simplified: a
+      point-like source and no Cherenkov light.</p>`,
+    params: { energyEV: 1e17 },
+    camera: 'side',
+    play: true,
+    chart: 'telescope',
+  },
+  {
     id: 'muons',
     title: 'Charged pions decay to muons',
     body: `<p>A charged pion lives 26 ns at rest (<i>c</i>τ ≈ 7.8 m). At high energy, time dilation stretches that

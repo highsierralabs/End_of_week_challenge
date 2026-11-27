@@ -32,3 +32,4 @@
 | EOWC-FIX-20261126-028 | Automation scripts pre-dismiss the welcome card |
 | EOWC-DOC-20261126-029 | README polish: parallel showers, muon timing wording, commands, URL options |
 | EOWC-CHG-20261126-030 | Fluorescence telescope view; replay brightness normalised by primary energy |
+| EOWC-CHG-20261126-031 | Tour step for the telescope; README telescope screenshot; debug hook syncs controls |

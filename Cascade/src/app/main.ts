@@ -240,6 +240,6 @@ if (!q.has('clean') && !q.has('data')) {
   get result() { return result; },
   get stage() { return stage; },
   seek: (t: number) => { tNs = t; playing = false; pushTime(); },
-  run: (p: Partial<ShowerParams>) => run({ ...controls.getParams(), ...p }),
+  run: (p: Partial<ShowerParams>) => { controls.setParams({ ...controls.getParams(), ...p }); return run(controls.getParams()); },
   sky: () => runSky(),
 };
