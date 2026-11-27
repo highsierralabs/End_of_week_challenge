@@ -161,6 +161,12 @@ export class ShowerLayer {
     const vBright = float(varying(bright, 'vBright') as unknown as Node<'float'>);
     const vColor = vec3(varying(this.palette.element(cls), 'vColor') as unknown as Node<'vec3'>);
     const vSide = varying(positionGeometry.x, 'vSide');
+    // Tracks seen end-on pile up at the shower's radiant; fade segments whose whole
+    // projected length is only a few pixels.
+    const sa = cameraProjectionMatrix.mul(modelViewMatrix.mul(vec4(aStart.xyz, 1)));
+    const se = cameraProjectionMatrix.mul(modelViewMatrix.mul(vec4(aEnd.xyz, 1)));
+    const projLen = sa.xy.div(max(sa.w, 1e-3)).sub(se.xy.div(max(se.w, 1e-3))).mul(screenSize).mul(0.5).length();
+    const vLen = float(varying(smoothstep(1.5, 14, projLen).mul(0.85).add(0.15), 'vLen') as unknown as Node<'float'>);
 
     mat.vertexNode = Fn(() => {
       const head = mix(aStart.xyz, aEnd.xyz, f);
@@ -194,7 +200,7 @@ export class ShowerLayer {
     })();
 
     const profile = float(1).sub(abs(vSide));
-    mat.colorNode = vec4(vColor.mul(vBright).mul(profile.mul(profile)), 1);
+    mat.colorNode = vec4(vColor.mul(vBright).mul(vLen).mul(profile.mul(profile)), 1);
     return mat;
   }
 
@@ -218,11 +224,13 @@ export class ShowerLayer {
     const vUv = varying(positionGeometry.xy.mul(vec2(1, 2)).sub(vec2(0, 1)), 'vSplashUv');
     mat.vertexNode = Fn(() => {
       const center = modelViewMatrix.mul(vec4(aPos.xyz, 1));
-      // Ring grows from 0.5 m to a few metres during the flash; heavier records are larger.
-      const size = mix(float(4), float(0.7), flash).mul(wFac).mul(visible);
-      const corner = vec3(positionGeometry.x, positionGeometry.y.mul(2).sub(1), 0).mul(size);
-      return cameraProjectionMatrix.mul(vec4(center.xyz.add(corner), 1));
-    })();
+      const clip = cameraProjectionMatrix.mul(center).toVar();
+      // Screen-space disc: a flash that shrinks to a small persistent dot. Pixels, so it never balloons.
+      const px = mix(float(3.5), float(9), flash).mul(wFac).mul(visible).mul(this.uDpr);
+      const corner = vec2(positionGeometry.x, positionGeometry.y.mul(2).sub(1));
+      const behind = step(float(0), center.z);
+      const off = corner.mul(px).div(screenSize).mul(2).mul(clip.w).mul(float(1).sub(behind));
+      return vec4(clip.xy.add(off), clip.z, clip.w);    })();
     const r = vUv.length();
     const disc = float(1).sub(smoothstep(0.0, 1.0, r));
     mat.colorNode = vec4(vColor.mul(vBright).mul(disc.mul(disc)), 1);

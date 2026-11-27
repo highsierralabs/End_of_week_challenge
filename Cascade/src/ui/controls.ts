@@ -16,6 +16,8 @@ export interface ControlHandlers {
   onCameraPreset(id: CameraPreset): void;
   onTour(): void;
   onAbout(): void;
+  /** Open the observatory comparison (optional). */
+  onObservatory?(): void;
   onQuality(q: Quality): void;
 }
 
@@ -100,8 +102,11 @@ export function createControls(el: HTMLElement, initial: ShowerParams, hd: Contr
   aboutBtn.addEventListener('click', () => hd.onAbout());
   // Tour / About sit in the panel header when buildLayout made one, else in a row on top.
   const slot = el.closest('.cx-panel')?.querySelector('.cx-panel-actions');
-  const actions = slot ? null : h('div', { class: 'cx-actions' }, tourBtn, aboutBtn);
-  if (slot) slot.append(tourBtn, aboutBtn);
+  const obsBtn = h('button', { type: 'button', class: 'cx-btn cx-btn--ghost cx-btn--obs', title: 'RHACO observatory data next to the simulation' });
+  obsBtn.append(h('span', { class: 'cx-obs-dot' }), h('span', { text: 'Data' }));
+  obsBtn.addEventListener('click', () => hd.onObservatory?.());
+  const actions = slot ? null : h('div', { class: 'cx-actions' }, obsBtn, tourBtn, aboutBtn);
+  if (slot) slot.append(obsBtn, tourBtn, aboutBtn);
 
   // ---- primary
   const primaryGroup = h('div', { class: 'cx-seg cx-seg--primary', role: 'radiogroup', 'aria-label': 'Primary particle' });

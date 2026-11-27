@@ -79,8 +79,17 @@ function blank(): Particle {
 
 export type ProgressFn = (fraction: number, tracked: number) => void;
 
-export function simulateShower(params: ShowerParams, onProgress?: ProgressFn): ShowerResult {
-  return new Cascade(params).run(onProgress);
+/**
+ * Optional observation planes (rate mode): onCross fires whenever a particle
+ * crosses one of the given altitudes (metres ASL) while moving down.
+ */
+export interface CascadeHooks {
+  planes: number[];
+  onCross(plane: number, type: PType, E: number, dx: number, dy: number, dz: number, w: number): void;
+}
+
+export function simulateShower(params: ShowerParams, onProgress?: ProgressFn, hooks?: CascadeHooks): ShowerResult {
+  return new Cascade(params, hooks).run(onProgress);
 }
 
 class Cascade {
@@ -140,8 +149,11 @@ class Cascade {
   private readonly sE: Vec3 = { x: 0, y: 0, z: -1 };
   private readonly sF: Vec3 = { x: 0, y: 0, z: -1 };
 
-  constructor(params: ShowerParams) {
+  readonly hooks: CascadeHooks | undefined;
+
+  constructor(params: ShowerParams, hooks?: CascadeHooks) {
     this.p = params;
+    this.hooks = hooks;
     this.rng = new Rng(params.seed);
     this.E0 = params.energyEV * 1e-9;
     this.zg = params.groundAltitudeM;
@@ -388,6 +400,17 @@ class Cascade {
 
   private record(x0: number, y0: number, z0: number, t0: number, rc: RClass, E: number): void {
     const c = this.cur;
+    if (this.hooks) {
+      const pl = this.hooks.planes;
+      for (let i = 0; i < pl.length; i++) {
+        const h = pl[i]!;
+        if (z0 > h && c.z <= h) {
+          // Energy at the crossing, interpolated between the step's start and end.
+          const eX = E + (c.E - E) * ((z0 - h) / Math.max(z0 - c.z, 1e-9));
+          this.hooks.onCross(i, c.type, eX, c.dx, c.dy, c.dz, c.w);
+        }
+      }
+    }
     if (t0 < this.tMin) this.tMin = t0;
     if (c.t > this.tMax) this.tMax = c.t;
     // profile: count planes crossed

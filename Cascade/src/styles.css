@@ -805,3 +805,27 @@ button { cursor: pointer; }
 @media (prefers-contrast: more) {
   :root { --panel: rgba(6, 9, 16, 0.94); --hair: rgba(190, 210, 245, 0.32); --muted: #a3aec0; }
 }
+
+/* ---------------------------------------------------------------- observatory dialog */
+.cx-obs { width: min(1180px, calc(100vw - 32px)); }
+.cx-obs-dot { width: 7px; height: 7px; border-radius: 50%; background: #7dff7a; box-shadow: 0 0 8px #7dff7a; display: inline-block; }
+.cx-btn--obs { gap: 6px; }
+.cx-obs-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 14px 0 8px; }
+.cx-obs-card { border: 1px solid var(--hair); border-radius: 10px; padding: 12px 14px; background: rgba(10, 14, 26, 0.55); }
+.cx-obs-card--meas { border-color: rgba(125, 255, 122, 0.35); }
+.cx-obs-card--sim { border-color: rgba(255, 207, 90, 0.35); }
+.cx-obs-k { font-size: 10.5px; font-weight: 650; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.cx-obs-v { font-family: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace; font-size: 19px; color: var(--text); margin: 6px 0 4px; }
+.cx-obs-v span { font-size: 11px; color: var(--muted); }
+.cx-obs-n { font-size: 12px; line-height: 1.45; color: var(--text-2); }
+.cx-obs-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 10px 0 4px; }
+.cx-obs-fig { margin: 0; }
+.cx-obs-fig figcaption { font-size: 11px; font-weight: 650; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text); margin-bottom: 6px; }
+.cx-obs-canvas { width: 100%; height: 250px; display: block; }
+.cx-obs-note { font-size: 11.5px; color: var(--muted); margin: 4px 0 0; line-height: 1.4; }
+.cx-obs-tag { font-size: 10px; letter-spacing: 0.08em; color: #ffcf5a; border: 1px solid rgba(255, 207, 90, 0.4); border-radius: 999px; padding: 1px 7px; margin-left: 6px; vertical-align: 1px; }
+.cx-obs-scope li { font-size: 12.5px; }
+@media (max-width: 760px) {
+  .cx-obs-cards, .cx-obs-charts { grid-template-columns: 1fr; }
+  .cx-obs-canvas { height: 220px; }
+}

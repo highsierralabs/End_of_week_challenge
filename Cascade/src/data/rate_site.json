@@ -1,0 +1,62 @@
+{
+ "generated": "scripts/precompute-rate.ts v1.0",
+ "options": {
+  "primaries": 240000,
+  "seed": 2026,
+  "eMinGeV": 4.5,
+  "eMaxGeV": 200000,
+  "norm": 18000,
+  "gamma": 2.7,
+  "zenithMaxDeg": 85,
+  "siteAltitudeM": 1539,
+  "dX": 10.2,
+  "lidCm": 4,
+  "wallCm": 3,
+  "leadLossGeVPerCm": 0.0127,
+  "crystalCm": 1,
+  "thresholdMeV": 2.78,
+  "csiDedxMeVPerCm": 5.6
+ },
+ "planes": [
+  {
+   "altitudeM": 1636.3006785608686,
+   "depth": 850.5555171156999,
+   "pressureHPa": 834.1100261922678,
+   "horizontalFlux": 0.04304463443810412,
+   "horizontalFlux1GeV": 0.03276929849042422,
+   "verticalIntensity1GeV": 0.018976649443514224,
+   "crystalBare": 0.08429518996121271,
+   "crystalShielded": 0.05179624435235379,
+   "crystalShieldedRelErr": 0.008841018038125724,
+   "muons": 40358
+  },
+  {
+   "altitudeM": 1539,
+   "depth": 860.7555171157,
+   "pressureHPa": 844.112809192268,
+   "horizontalFlux": 0.04228523655614978,
+   "horizontalFlux1GeV": 0.03229254167408491,
+   "verticalIntensity1GeV": 0.018694389787778837,
+   "crystalBare": 0.08280078730099423,
+   "crystalShielded": 0.05088555502957444,
+   "crystalShieldedRelErr": 0.008954905851381019,
+   "muons": 39646
+  },
+  {
+   "altitudeM": 1442.642377624792,
+   "depth": 870.9555171157,
+   "pressureHPa": 854.115592192268,
+   "horizontalFlux": 0.04153223809454899,
+   "horizontalFlux1GeV": 0.03176778920509399,
+   "verticalIntensity1GeV": 0.01840967394945859,
+   "crystalBare": 0.08120577365768776,
+   "crystalShielded": 0.04987748019692367,
+   "crystalShieldedRelErr": 0.009008160776646745,
+   "muons": 38940
+  }
+ ],
+ "barometricPctPerHPa": -0.18848475867260436,
+ "barometricErr": 0.006027923120143761,
+ "primaryRatePerM2": 2559.7681414222684,
+ "cpuMs": 322195
+}

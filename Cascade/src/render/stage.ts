@@ -168,8 +168,8 @@ export class Stage {
           pos = mid.clone().addScaledVector(side, height * 1.05).add(new THREE.Vector3(0, -height * 0.05, 0));
           break;
         case 'ground':
-          target = top.clone().lerp(mid, 0.7);
-          pos = core.clone().addScaledVector(side, 60).add(new THREE.Vector3(0, 6, 0));
+          target = this.axisPoint(r.params.groundAltitudeM + 900);
+          pos = core.clone().addScaledVector(side, 700).addScaledVector(axR, 350).add(new THREE.Vector3(0, 35, 0));
           break;
         case 'detector':
           target = new THREE.Vector3(0, 0.85, 0);

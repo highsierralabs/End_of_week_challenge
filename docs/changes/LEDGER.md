@@ -8,3 +8,4 @@
 | EOWC-CHG-20261126-004 | User interface: controls, timeline, charts, tour, about |
 | EOWC-CHG-20261126-005 | Aggregate RHACO data snapshot and its generator |
 | EOWC-CHG-20261126-006 | Integrate worker, GPU track replay, detector, stage and app; physics unit tests |
+| EOWC-CHG-20261126-007 | Rate mode, Observatory comparison with the RHACO snapshot, physics doc, licence, Pages workflow |

@@ -8,6 +8,7 @@ import { DEFAULT_PARAMS } from '../physics/cascade';
 import type { ShowerParams, ShowerResult } from '../physics/types';
 import { SimClient } from '../sim/client';
 import { Stage, type CameraPreset } from '../render/stage';
+import { createObservatory } from '../ui/observatory';
 
 const q = new URLSearchParams(location.search);
 const layout = buildLayout(document.getElementById('app')!);
@@ -61,6 +62,7 @@ const controls = createControls(layout.controls, initial, {
   onCameraPreset: (id) => { userCamera = true; stage?.setPreset(id as CameraPreset); },
   onTour: () => tour.open(),
   onAbout: () => about.open(),
+  onObservatory: () => observatory.open(),
   onQuality: (qq) => { quality = qq; stage?.setQuality(qq); layout.toast(`Quality: ${qq} (applies to the next shower)`); },
 }, { quality, camera: 'overview' });
 
@@ -79,6 +81,8 @@ const tour = createTour(layout.overlay, {
   onClose: () => undefined,
 });
 const about = createAbout(layout.overlay);
+const observatory = createObservatory(layout.overlay);
+if (q.has('data')) setTimeout(() => observatory.open(), 300);
 
 async function run(p: ShowerParams, camera?: string, play = true): Promise<void> {
   const params: ShowerParams = { ...p, maxSegments: SEGMENTS[quality] };
