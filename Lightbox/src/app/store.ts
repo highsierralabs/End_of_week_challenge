@@ -8,6 +8,7 @@ import type { View } from './view';
 export type Change = 'load' | 'scene' | 'camera' | 'display' | 'select';
 
 export const BUILTIN_MESHES: Record<string, string> = { wineglass: 'Wine glass', tumbler: 'Tumbler', knot: 'Trefoil knot', cat: 'Cat figurine' };
+const isBuiltin = (name: string): boolean => Object.hasOwn(BUILTIN_MESHES, name);
 
 export class Meshes {
   readonly lib = new MeshLibrary();
@@ -28,7 +29,7 @@ export class Meshes {
   /** Load any built-in meshes the scene uses and are not in memory yet. */
   async ensure(scene: Scene): Promise<void> {
     const need = new Set<string>();
-    for (const o of scene.objects) if (o.shape.kind === 'mesh' && !this.lib.has(o.shape.mesh) && o.shape.mesh in BUILTIN_MESHES) need.add(o.shape.mesh);
+    for (const o of scene.objects) if (o.shape.kind === 'mesh' && !this.lib.has(o.shape.mesh) && isBuiltin(o.shape.mesh)) need.add(o.shape.mesh);
     await Promise.all([...need].map(async (name) => {
       const res = await fetch(`./models/${name}.glb`);
       if (!res.ok) throw new Error(`Could not load the ${BUILTIN_MESHES[name]} model (${res.status}).`);
@@ -51,7 +52,7 @@ export class Meshes {
     return name;
   }
 
-  label(name: string): string { return BUILTIN_MESHES[name] ?? this.user.get(name) ?? name; }
+  label(name: string): string { return (isBuiltin(name) ? BUILTIN_MESHES[name] : this.user.get(name)) ?? name; }
   triangles(name: string): number { return this.lib.lookup(name)?.tris ?? 0; }
 
   /** Ray against a mesh asset in its own space, for picking. */
@@ -61,11 +62,15 @@ export class Meshes {
   };
 }
 
+/** A studio session set aside while the tour or the spectroscope borrows the view. */
+export interface Stash { scene: Scene; undo: string[]; redo: string[]; selected: string | null }
+
 export class Store {
   scene: Scene = undefined as unknown as Scene;
   selectedId: string | null = null;
   private undoStack: string[] = [];
   private redoStack: string[] = [];
+  private generation = 0;
   private readonly listeners = new Set<(c: Change) => void>();
 
   constructor(readonly view: View, readonly meshes: Meshes) {}
@@ -77,20 +82,42 @@ export class Store {
     return this.scene?.objects.find((o) => o.id === this.selectedId) ?? null;
   }
 
-  /** Replace the scene (a preset, a shared link, a tour step). */
-  async load(scene: Scene, keepHistory = false): Promise<void> {
+  /**
+   * Replace the scene (a preset, a shared link, a tour step). Returns false if a later load
+   * overtook this one while its models were still arriving.
+   */
+  async load(scene: Scene, keepHistory = false): Promise<boolean> {
+    const mine = ++this.generation;
     await this.meshes.ensure(scene);
+    if (mine !== this.generation) return false;
     if (!keepHistory) { this.undoStack = []; this.redoStack = []; }
     this.scene = scene;
     reserveIds(scene);
     this.selectedId = null;
     this.view.setScene(scene);
     this.emit('load');
+    return true;
+  }
+
+  /** Set the studio's session aside, to bring back with unstash. */
+  stash(): Stash { return { scene: this.scene, undo: this.undoStack, redo: this.redoStack, selected: this.selectedId }; }
+  async unstash(s: Stash): Promise<void> {
+    if (!(await this.load(s.scene))) return;
+    this.undoStack = s.undo;
+    this.redoStack = s.redo;
+    this.selectedId = s.scene.objects.some((o) => o.id === s.selected) ? s.selected : null;
+    this.emit('load');
+  }
+
+  /** What undo covers: the things in the scene, not the camera or the darkroom. */
+  private capture(): string {
+    const s = this.scene;
+    return JSON.stringify({ objects: s.objects, env: s.env, bounces: s.bounces });
   }
 
   /** Remember the scene as it is now; call before changing it. */
   snapshot(): void {
-    this.undoStack.push(JSON.stringify(this.scene));
+    this.undoStack.push(this.capture());
     if (this.undoStack.length > 60) this.undoStack.shift();
     this.redoStack = [];
   }
@@ -119,12 +146,14 @@ export class Store {
   get canRedo(): boolean { return this.redoStack.length > 0; }
 
   private restore(from: string[], to: string[]): void {
-    const s = from.pop();
-    if (!s) return;
-    to.push(JSON.stringify(this.scene));
-    const keep = this.selectedId;
-    this.scene = JSON.parse(s) as Scene;
-    this.selectedId = this.scene.objects.some((o) => o.id === keep) ? keep : null;
+    const snap = from.pop();
+    if (!snap) return;
+    to.push(this.capture());
+    const v = JSON.parse(snap) as Pick<Scene, 'objects' | 'env' | 'bounces'>;
+    this.scene.objects = v.objects;
+    this.scene.env = v.env;
+    this.scene.bounces = v.bounces;
+    if (!this.scene.objects.some((o) => o.id === this.selectedId)) this.selectedId = null;
     this.view.setScene(this.scene);
     this.emit('load');
   }

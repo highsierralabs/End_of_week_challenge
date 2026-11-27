@@ -46,8 +46,14 @@ vec2 sampleAperture(vec2 u) {
 // Scattering at a surface that deflects light in one direction only (or, for glass, one of
 // two): glass, a mirror, polished metal, a grating. Updates the ray, its weight and the
 // absorbing medium it travels in.
-void scatterDelta(int mt, vec4 m0, vec4 m1, int obj, vec3 p, vec3 ng, vec3 ns, bool back,
-                  inout vec3 ro, inout vec3 rd, inout float w, inout int absRow) {
+//
+// Radiance is not conserved across a refracting surface, radiance / n^2 is: a camera path that
+// crosses into glass must scale what it will find there by (n_from / n_to)^2. Paths that come
+// back out cancel the factor; paths that end inside glass (a lamp or a matte object embedded in
+// it, a photon gather there) need it. Photons carry flux and take no such factor, so the
+// caller says which it is, and etaScale accumulates the factor for the roulette to ignore.
+void scatterDelta(int mt, vec4 m0, vec4 m1, int obj, vec3 p, vec3 ng, vec3 ns, bool back, bool radiance,
+                  inout vec3 ro, inout vec3 rd, inout float w, inout float etaScale, inout int absRow) {
   float cosi = dot(-rd, ns);
   if (cosi <= 0.0) { ns = ng; cosi = dot(-rd, ng); }
   if (mt == M_GLASS) {
@@ -68,6 +74,7 @@ void scatterDelta(int mt, vec4 m0, vec4 m1, int obj, vec3 p, vec3 ng, vec3 ns, b
       rd = normalize(eta * rd + (eta * cosi - cost) * ns);
       ro = p - ng * EPS;
       absRow = back ? -1 : int(m0.z);
+      if (radiance) { w *= eta * eta; etaScale *= eta * eta; }
     }
   } else if (mt == M_GRATING) {
     // Thin transmission grating: the direction component across the grooves shifts by
@@ -114,7 +121,9 @@ out vec4 outColor;
 
 // Radiance leaving x toward wo due to photons that arrived there through specular objects:
 // a density estimate over the photons of wavelength slot k within the gather radius.
-float gatherCaustic(vec3 x, vec3 n, vec3 wo, int mt, vec4 m0, int k) {
+// Photons that made more specular bounces than the path has left are skipped, so the bounce
+// limit means the same with and without the map.
+float gatherCaustic(vec3 x, vec3 n, vec3 wo, int mt, vec4 m0, int k, int bouncesLeft) {
   ivec3 base = ivec3(floor(x / uCell + uGridShift - 0.5));
   float sum = 0.0;
   float flat2 = 0.09 * uRadius2;
@@ -123,7 +132,8 @@ float gatherCaustic(vec3 x, vec3 n, vec3 wo, int mt, vec4 m0, int k) {
     uint h = cellHash(c, k) % uint(uHashW * uHashW);
     ivec2 t = ivec2(int(h) % uHashW, int(h) / uHashW);
     vec4 B = texelFetch(uHashB, t, 0);
-    if (int(B.w + 0.5) != k + 1) continue;
+    int code = int(B.w + 0.5);
+    if ((code & 15) != k + 1 || (code >> 4) > bouncesLeft) continue;
     vec4 A = texelFetch(uHashA, t, 0);
     if (ivec3(floor(A.xyz / uCell + uGridShift)) != c) continue;
     vec3 dv = x - A.xyz;
@@ -167,6 +177,7 @@ void main() {
   if (uVignette == 1) { float c = dot(rd, uCamF); vig = c * c * c * c; }
 
   float thr = 1.0;
+  float etaScale = 1.0;
   float L = 0.0;
   int bounce = 0;
   int nDiff = 0;
@@ -237,14 +248,14 @@ void main() {
     bounce++;
 
     if (isDeltaMat(mt, m0)) {
-      scatterDelta(mt, m0, m1, h.obj, p, ng, ns, back, ro, rd, thr, absRow);
+      scatterDelta(mt, m0, m1, h.obj, p, ng, ns, back, true, ro, rd, thr, etaScale, absRow);
       if (nDiff == 0) sawDelta = true; else chain = true;
       lastDelta = true;
     } else {
       if (dot(wo, ns) <= 0.0) ns = ng;
       // ---- caustic light on a surface seen through glass or in a mirror: gather photons
       if (uPM == 1 && nDiff == 0 && sawDelta) {
-        float g = thr * gatherCaustic(p, ns, wo, mt, m0, lamK);
+        float g = thr * gatherCaustic(p, ns, wo, mt, m0, lamK, uMaxBounces - bounce);
         L += min(g, uClamp);
       }
       // ---- next-event estimation: one light, one shadow ray
@@ -265,10 +276,28 @@ void main() {
           // The light shines only within a cone about its normal: draw the emission direction
           // from that cone and find the point on the aperture it must have left from.
           vec3 ln = normalize(vec3(lightTexel(l, 1).y, lightTexel(l, 2).y, lightTexel(l, 3).y));
-          vec3 e = coneDir(ln, lm1.z, vec2(rnd(), rnd()));
           vec3 lc = objTexel(lo, 6).xyz;
-          float s = dot(p - lc, ln) / dot(e, ln);
-          if (s > 4.0 * EPS) {
+          float ahead = dot(p - lc, ln);
+          // Two ways to connect to a beam, each hopeless where the other is good. Seen from
+          // far away the cone's footprint is wider than the aperture: pick a point on the
+          // aperture and check that we are inside its cone. Close up, or for a collimated
+          // beam, the footprint is narrower than the aperture: pick a direction from the cone
+          // and find the aperture point it must have left from.
+          bool wide = ahead * ahead * lm1.w > (L0.w / PI) * (1.0 - lm1.w);
+          if (ahead > 4.0 * EPS && wide) {
+            vec3 lp;
+            vec3 lnp;
+            lightPoint(l, lot, vec3(rnd(), rnd(), rnd()), lp, lnp);
+            vec3 dv = lp - p;
+            float d2 = dot(dv, dv);
+            dist = sqrt(d2);
+            wi = dv / dist;
+            float cl = dot(ln, -wi);
+            vec3 cr = cross(ln, wi);
+            if (cl > 1.0e-6 && dot(cr, cr) <= lm1.w) lpdf = pick * d2 / (cl * L0.w);
+          } else if (ahead > 4.0 * EPS) {
+            vec3 e = coneDir(ln, lm1.z, vec2(rnd(), rnd()));
+            float s = ahead / dot(e, ln);
             vec3 y = p - e * s;
             vec4 r0 = objTexel(lo, 0);
             vec4 r2 = objTexel(lo, 2);
@@ -365,14 +394,14 @@ void main() {
     }
     // Russian roulette on the throughput.
     if (bounce > 3) {
-      float q = clamp(thr, 0.05, 1.0);
+      float q = clamp(thr / etaScale, 0.05, 1.0);
       if (rnd() > q) alive = false;
       thr /= q;
     }
   }
 
   vec3 xyz = cmf() * (L * invPdfLam * vig);
-  if (!(xyz.x >= 0.0 || xyz.x < 0.0) || !(xyz.y >= 0.0) || !(xyz.z >= 0.0 || xyz.z < 0.0) || xyz.y > 1.0e20) xyz = vec3(0.0);
+  if (notFinite(xyz.x) || notFinite(xyz.y) || notFinite(xyz.z) || xyz.y < 0.0 || xyz.y > 1.0e20) xyz = vec3(0.0);
   outColor = texelFetch(uPrev, px, 0) + vec4(xyz, 1.0);
 }
 `;
@@ -449,6 +478,7 @@ void main() {
   // ---- follow it through the specular objects
   vec3 ro = lp + ln * EPS;
   int absRow = -1;
+  float etaUnused = 1.0;
   int specCount = 0;
   bool connect = false;
   vec3 cro = vec3(0.0);
@@ -476,16 +506,18 @@ void main() {
     vec3 ng = back ? -h.n : h.n;
     vec3 ns = back ? -h.ns : h.ns;
     if (isDeltaMat(mt, m0)) {
-      if (specCount >= uMaxBounces) return;
+      // The matte vertex this photon ends on is a bounce too.
+      if (specCount + 1 >= uMaxBounces) return;
       specCount++;
-      scatterDelta(mt, m0, m1, h.obj, p, ng, ns, back, ro, rd, alpha, absRow);
+      scatterDelta(mt, m0, m1, h.obj, p, ng, ns, back, false, ro, rd, alpha, etaUnused, absRow);
       continue;
     }
     if (specCount == 0) return;
     // ---- first non-specular surface: leave a photon for the map (position, weight, the
     // direction it came from, its wavelength slot), then connect to the lens
+    if (notFinite(alpha)) return;
     outHit = vec4(p, alpha);
-    outDir = vec4(rd, float(lamK + 1));
+    outDir = vec4(rd, float(lamK + 1 + 16 * min(specCount, 127)));
     vec3 lensP = uCamPos;
     if (uLensR > 0.0) {
       vec2 a = sampleAperture(vec2(rnd(), rnd())) * uLensR;
@@ -510,7 +542,7 @@ void main() {
     float c = alpha * fcos / (d2 * uPixArea * cosL * cosL * cosL);
     if (uVignette == 1) c *= cosL * cosL * cosL * cosL;
     cval = cmf() * (c * invPdfLam);
-    if (!(cval.y >= 0.0) || cval.y > 1.0e20) return;
+    if (notFinite(cval.x) || notFinite(cval.y) || notFinite(cval.z) || cval.y < 0.0 || cval.y > 1.0e20) return;
     cpix = pixf;
     connect = true;
     cro = p + ng * EPS;
@@ -556,7 +588,7 @@ void main() {
   gl_PointSize = 1.0;
   if (vDir.w < 0.5) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
   ivec3 cell = ivec3(floor(vHit.xyz / uCell + uGridShift));
-  uint h = cellHash(cell, int(vDir.w + 0.5) - 1) % uint(uHashW * uHashW);
+  uint h = cellHash(cell, (int(vDir.w + 0.5) & 15) - 1) % uint(uHashW * uHashW);
   vec2 t = vec2(float(int(h) % uHashW), float(int(h) / uHashW));
   float depth = float(pcg(uint(gl_VertexID) ^ pcg(uFrame + 0x77u)) >> 8) * (1.0 / 16777216.0);
   gl_Position = vec4((t + 0.5) / float(uHashW) * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);

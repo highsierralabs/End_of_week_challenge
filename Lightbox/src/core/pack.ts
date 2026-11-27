@@ -1,7 +1,7 @@
 // Turns a Scene into the flat arrays the shaders read (layout documented in
 // gpu/shaders/common.ts). Pure: no WebGL here, so the packing is unit-testable.
 import { type Material, type Scene, type SceneObject, isDelta, isEmitter } from './scene';
-import { boundRadius, emitterArea, shapePlanes, shapeScale } from './shapes';
+import { MIN_ROUGH, boundRadius, emitterArea, lensParams, shapePlanes, shapeScale } from './shapes';
 import { CMF, NS, type Spectrum, absorption, glassSpectrum, lightSpectrum, metalSpectra, reflectance, wavelengthTable } from './spectrum';
 import { type Affine, type Vec3, compose, eulerToMat3, invertAffine } from './vec';
 
@@ -72,6 +72,9 @@ export function sampledLight(o: SceneObject): boolean {
   return k === 'sphere' || k === 'quad' || k === 'disc' || k === 'cylinder' || k === 'box';
 }
 
+/** Roughness as the shader gets it: anything below MIN_ROUGH is a polished surface. */
+const polish = (rough: number): number => (rough < MIN_ROUGH ? 0 : Math.min(1, rough));
+
 export function objectTransform(o: SceneObject): Affine {
   return compose(o.pos, o.rot, shapeScale(o.shape));
 }
@@ -111,11 +114,11 @@ export function packScene(scene: Scene, meshes: MeshLookup): Packed {
     let rec: number[];
     switch (m.kind) {
       case 'diffuse': rec = [MAT_TYPE.diffuse, row(`r${m.color.join()}`, () => reflectance(m.color)), 0, 0, 0, 0, 0, 0]; break;
-      case 'plastic': rec = [MAT_TYPE.plastic, row(`r${m.color.join()}`, () => reflectance(m.color)), 0, m.rough, 0, 0, 0, 0]; break;
+      case 'plastic': rec = [MAT_TYPE.plastic, row(`r${m.color.join()}`, () => reflectance(m.color)), 0, polish(m.rough), 0, 0, 0, 0]; break;
       case 'metal': {
         const n = row(`mn${m.metal}`, () => metalSpectra(m.metal)[0]);
         const k = row(`mk${m.metal}`, () => metalSpectra(m.metal)[1]);
-        rec = [MAT_TYPE.metal, n, k, m.rough, 0, 0, 0, 0];
+        rec = [MAT_TYPE.metal, n, k, polish(m.rough), 0, 0, 0, 0];
         break;
       }
       case 'mirror': rec = [MAT_TYPE.mirror, 0, 0, 0, 0, 0, 0, 0]; break;
@@ -123,7 +126,7 @@ export function packScene(scene: Scene, meshes: MeshLookup): Packed {
         const ior = row(`g${m.glass}`, () => glassSpectrum(m.glass));
         const tinted = m.tint && (m.density ?? 0) > 0;
         const ab = tinted ? row(`a${m.tint!.join()}@${m.density}`, () => absorption(m.tint!, m.density!)) : -1;
-        rec = [MAT_TYPE.glass, ior, ab, m.rough ?? 0, 0, 0, 0, 0];
+        rec = [MAT_TYPE.glass, ior, ab, 0, 0, 0, 0, 0];
         break;
       }
       case 'light': rec = [MAT_TYPE.light, row(`l${JSON.stringify(m.spectrum)}`, () => lightSpectrum(m.spectrum)), 0, 0, luminance, 0, 0, 0]; break;
@@ -182,7 +185,7 @@ export function packScene(scene: Scene, meshes: MeshLookup): Packed {
       obj.set([planeList.length / 4, planes.length, 0, 0], base + 16);
       for (const p of planes) planeList.push(p[0], p[1], p[2], p[3]);
     } else if (o.shape.kind === 'lens') {
-      obj.set([o.shape.r, o.shape.t, o.shape.r1, o.shape.r2], base + 16);
+      obj.set(lensParams(o.shape), base + 16);
     } else if (o.shape.kind === 'mesh') {
       obj.set([meshes(o.shape.mesh)!.root, 0, 0, 0], base + 16);
     }

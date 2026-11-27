@@ -9,7 +9,8 @@ import { button, clear, h } from './controls';
 import { Interaction } from './interact';
 import { Panel } from './panel';
 import { Spectroscope } from './spectroscope';
-import { Meshes, Store } from './store';
+import { REST_GAP } from '../core/shapes';
+import { Meshes, type Stash, Store } from './store';
 import { Tour } from './tour';
 import { View } from './view';
 
@@ -60,6 +61,7 @@ function fail(message: string): void {
 
 let toastTimer = 0;
 function say(text: string, ms = 2600): void {
+  if (!text) return;
   toast.textContent = text;
   toast.classList.add('on');
   clearTimeout(toastTimer);
@@ -69,18 +71,31 @@ function say(text: string, ms = 2600): void {
 async function deflate(text: string): Promise<Uint8Array> {
   const cs = new CompressionStream('deflate-raw');
   const w = cs.writable.getWriter();
-  void w.write(new TextEncoder().encode(text));
-  void w.close();
+  w.write(new TextEncoder().encode(text)).catch(() => {});
+  w.close().catch(() => {});
   return new Uint8Array(await new Response(cs.readable).arrayBuffer());
 }
 async function inflate(bytes: Uint8Array): Promise<string> {
   const ds = new DecompressionStream('deflate-raw');
   const w = ds.writable.getWriter();
-  void w.write(bytes as unknown as BufferSource);
-  void w.close();
-  const buf = await new Response(ds.readable).arrayBuffer();
-  if (buf.byteLength > 400_000) throw new Error('The shared scene is too large.');
-  return new TextDecoder().decode(buf);
+  // Failures surface on the reading side; these promises must not be left unhandled.
+  w.write(bytes as unknown as BufferSource).catch(() => {});
+  w.close().catch(() => {});
+  // Read in pieces and stop as soon as the scene is larger than any real one could be.
+  const reader = ds.readable.getReader();
+  const parts: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > 400_000) { void reader.cancel(); throw new Error('The shared scene is too large.'); }
+    parts.push(value);
+  }
+  const all = new Uint8Array(size);
+  let at = 0;
+  for (const part of parts) { all.set(part, at); at += part.byteLength; }
+  return new TextDecoder().decode(all);
 }
 
 function download(blob: Blob, name: string): void {
@@ -106,7 +121,9 @@ function start(): void {
   const tour = new Tour(tourRoot, store);
   const spectro = new Spectroscope(spectroRoot, store);
   let mode: Mode = 'studio';
+  let exporting = false;
   interaction.onHint = say;
+  panel.onNote = (text) => say(text, 6000);
   spectro.project = (p) => interaction.project(p);
 
   // ---- layout
@@ -117,12 +134,22 @@ function start(): void {
     // Cap the pixel count: phones report three device pixels per CSS pixel.
     const k = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(2.4e6 / (w * hgt)));
     view.resize(Math.round(w * k), Math.round(hgt * k));
+    if (mode === 'spectro') spectro.fit();
     interaction.drawOverlay();
   };
   new ResizeObserver(fit).observe(stage);
 
   // ---- top bar
+  sceneSelect.append(h('option', { value: '', text: 'Your scene', disabled: true }));
   for (const sc of SCENES) sceneSelect.append(h('option', { value: sc.id, text: sc.title }));
+  const resetBtn = button('Reset', () => { const e = sceneById(sceneSelect.value); if (e) void loadScene(e.make()); }, 'ghost');
+  resetBtn.title = 'Put this scene back as it was';
+  sceneSelect.after(resetBtn);
+  store.on((c) => {
+    if (c !== 'load' || mode !== 'studio') return;
+    sceneSelect.value = SCENES.find((sc) => sc.title === store.scene.name)?.id ?? '';
+    resetBtn.disabled = sceneSelect.value === '';
+  });
   sceneSelect.addEventListener('change', () => { void loadScene(sceneById(sceneSelect.value)!.make()); });
   const modes: [Mode, string][] = [['studio', 'Studio'], ['tour', 'Tour'], ['spectro', 'Spectroscope']];
   for (const [m, label] of modes) modeBar.append(h('button', { type: 'button', role: 'tab', class: 'lb-mode', 'data-mode': m, text: label, onclick: () => { void setMode(m); } }));
@@ -151,13 +178,20 @@ function start(): void {
     }
   }
 
-  async function setMode(m: Mode): Promise<void> {
+  // The studio's own scene and history, set aside while another mode borrows the picture.
+  let studioStash: Stash | null = null;
+  async function setMode(m: Mode, adopt = false): Promise<void> {
+    if (exporting) return;
+    if (mode === 'studio' && m !== 'studio' && store.scene) studioStash = store.stash();
+    if (mode === 'spectro' && m !== 'spectro') spectro.leave();
+    const back = mode !== 'studio' && m === 'studio';
     mode = m;
     for (const b of modeBar.querySelectorAll('button')) b.setAttribute('aria-selected', String(b.dataset.mode === m));
     studioRoot.hidden = m !== 'studio';
     tourRoot.hidden = m !== 'tour';
     spectroRoot.hidden = m !== 'spectro';
     sceneSelect.hidden = m !== 'studio';
+    resetBtn.hidden = m !== 'studio';
     interaction.editable = m === 'studio';
     interaction.cameraLocked = m === 'spectro';
     interaction.decorate = m === 'spectro' ? spectro.ruler : null;
@@ -165,11 +199,17 @@ function start(): void {
     app.dataset.mode = m;
     if (m === 'tour') await tour.enter();
     else if (m === 'spectro') await spectro.enter();
-    else { panel.render(); }
+    else {
+      // Coming back: the studio's scene returns, unless the visitor asked to keep this one.
+      if (back && !adopt && studioStash) await store.unstash(studioStash);
+      if (back && adopt) await store.load(store.scene);
+      studioStash = null;
+      panel.render();
+    }
     interaction.drawOverlay();
     syncButtons();
   }
-  tour.onTry = async () => { await setMode('studio'); panel.show('scene'); say('This scene is yours now: move things, change the light.'); };
+  tour.onTry = async () => { await setMode('studio', true); panel.show('scene'); say('This scene is yours now: move things, change the light.'); };
 
   // ---- status line
   let lastStatus = 0;
@@ -198,13 +238,14 @@ function start(): void {
     try { await navigator.clipboard.writeText(url); copied = true; } catch { /* the address bar has it */ }
     say(`${copied ? 'Link copied' : 'Link is in the address bar'}${scene.objects.length < before ? ' (without your own models, which stay on this device)' : ''}.`, 4000);
   }
+  let badLink = false;
   async function fromHash(): Promise<Scene | null> {
     const m = /^#s=([A-Za-z0-9_-]+)$/.exec(location.hash);
     if (!m) return null;
     try {
       return sanitizeScene(JSON.parse(await inflate(fromBase64Url(m[1]!))));
     } catch {
-      say('That shared link could not be read; showing the default scene.', 5000);
+      badLink = true;
       return null;
     }
   }
@@ -214,7 +255,6 @@ function start(): void {
     view.tracer.present(view.look());
     canvas.toBlob((b) => { if (b) download(b, `lightbox-${view.tracer.frame}spp.png`); }, 'image/png');
   }
-  let exporting = false;
   let cancelExport = false;
   async function exportPicture(w: number, hgt: number, samples: number): Promise<void> {
     const t = view.tracer;
@@ -223,6 +263,8 @@ function start(): void {
     exporting = true;
     cancelExport = false;
     panel.exportBusy = true;
+    interaction.frozen = true;
+    app.classList.add('lb-exporting');
     view.stop();
     const old: [number, number] = [t.width, t.height];
     const exposure = view.autoExposure;
@@ -256,6 +298,8 @@ function start(): void {
       progress.hidden = true;
       exporting = false;
       panel.exportBusy = false;
+      interaction.frozen = false;
+      app.classList.remove('lb-exporting');
       view.resize(old[0], old[1]);
       fit();
       view.start();
@@ -273,7 +317,7 @@ function start(): void {
       const name = await meshes.addFile(file);
       store.snapshot();
       const cam = store.scene.camera;
-      store.scene.objects.push({ id: `u${Date.now().toString(36)}`, name: meshes.label(name), shape: { kind: 'mesh', mesh: name, size: 0.3 }, pos: [cam.target[0], 0, cam.target[2]], rot: [0, 0, 0], material: { kind: 'glass', glass: 'bk7' } });
+      store.scene.objects.push({ id: `u${Date.now().toString(36)}`, name: meshes.label(name), shape: { kind: 'mesh', mesh: name, size: 0.3 }, pos: [cam.target[0], REST_GAP, cam.target[2]], rot: [0, 0, 0], material: { kind: 'glass', glass: 'bk7' } });
       await store.load(store.scene, true);
       store.select(store.scene.objects[store.scene.objects.length - 1]!.id);
       say(`${meshes.label(name)}: ${meshes.triangles(name).toLocaleString()} triangles.`);
@@ -287,14 +331,19 @@ function start(): void {
   stage.addEventListener('drop', (e) => {
     e.preventDefault();
     const f = e.dataTransfer?.files?.[0];
-    if (f && mode === 'studio' && /\.(glb|obj)$/i.test(f.name)) void addModel(f);
+    if (!f || exporting) return;
+    if (mode !== 'studio') say('Open the studio to add a model.');
+    else if (/\.(glb|obj)$/i.test(f.name)) void addModel(f);
+    else say('Lightbox can read .glb and .obj models.');
   });
 
   // ---- keyboard
   window.addEventListener('keydown', (e) => {
     const el = e.target as HTMLElement;
-    if (el.closest('input, select, textarea, dialog, [role=slider]')) return;
+    if (exporting || el.closest('input[type=text], textarea, dialog')) return;
     const mod = e.ctrlKey || e.metaKey;
+    // Undo and redo work wherever the focus is; the single-key shortcuts only from the page.
+    if (!mod && el.closest('input, select, [role=slider]')) return;
     if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) store.redo(); else store.undo(); return; }
     if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); store.redo(); return; }
     if (mod) return;
@@ -325,16 +374,33 @@ function start(): void {
     state: () => ({ mode, frame: view.tracer.frame, photons: view.tracer.photons, size: [view.tracer.width, view.tracer.height], objects: store.scene?.objects.length ?? 0, selected: store.selectedId, scene: store.scene?.name, tourStep: tour.step, canUndo: store.canUndo }),
   };
 
+  stage.classList.add('lb-loading');
+  view.tracer.ready().then(() => stage.classList.remove('lb-loading'), () => {});
   status.textContent = 'Compiling shaders…';
   canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); view.stop(); say('The graphics context was lost. Reload the page to continue.', 60000); });
   view.tracer.ready().then(async () => {
     fit();
     const shared = await fromHash();
-    await store.load(shared ?? SCENES[0]!.make());
+    const attempts: (() => Scene)[] = [
+      ...(shared ? [() => shared] : []),
+      () => SCENES[0]!.make(),
+      // Last resort if the models cannot be fetched: the default scene without them.
+      () => { const s = SCENES[0]!.make(); s.objects = s.objects.filter((o) => o.shape.kind !== 'mesh'); return s; },
+    ];
+    let problem = badLink ? 'That shared link could not be read; showing the default scene.' : '';
+    for (const make of attempts) {
+      try {
+        await store.load(make());
+        break;
+      } catch (e) {
+        problem = `${(e as Error).message} Showing what could be loaded.`;
+      }
+    }
     await setMode('studio');
     view.start();
     window.lightbox.ready = true;
-    if (!shared) say('Drag an object to move it. Drag the background to look around.', 5000);
+    const coarse = window.matchMedia('(pointer: coarse)').matches;
+    say(problem || (shared ? '' : coarse ? 'Drag an object to move it. Drag the background to look around, pinch to move in.' : 'Drag an object to move it. Drag the background to look around.'), problem ? 6000 : 5000);
   }).catch((e: Error) => fail(e.message));
 }
 

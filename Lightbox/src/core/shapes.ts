@@ -163,6 +163,27 @@ export function shapeScale(shape: Shape): Vec3 {
   }
 }
 
+/**
+ * How far above the table a resting object is placed. Glass standing exactly on the table
+ * would share a plane with it, and which of two coincident surfaces a ray meets is rounding;
+ * a tenth of a millimetre of air is also what is really there.
+ */
+export const REST_GAP = 1e-4;
+
+/** Roughness below this is treated as polished: the microfacet lobe is then narrower than a pixel. */
+export const MIN_ROUGH = 0.02;
+
+/**
+ * The lens actually traced: [aperture radius, centre thickness, R1, R2]. A spherical face can
+ * only span an aperture smaller than its own radius, so the aperture is reduced to fit the
+ * more strongly curved face; then the solid is closed for any thickness.
+ */
+export function lensParams(shape: { r: number; t: number; r1: number; r2: number }): [number, number, number, number] {
+  let r = shape.r;
+  for (const R of [shape.r1, shape.r2]) if (R !== 0) r = Math.min(r, 0.985 * Math.abs(R));
+  return [r, shape.t, shape.r1, shape.r2];
+}
+
 /** Sag of a spherical cap of curvature radius R over an aperture of radius r. */
 export function lensSag(R: number, r: number): number {
   if (R === 0) return 0;
@@ -252,8 +273,10 @@ export function hitPolytope(planes: Plane[], o: Vec3, d: Vec3, tmin: number): Hi
 
 /**
  * Lens on the y axis: aperture radius ra, centre thickness tc, top face curvature R1, bottom R2
- * (positive convex, negative concave, 0 flat). Each candidate surface crossing is kept only if
- * it lies on the lens boundary; the nearest with t > tmin wins.
+ * (positive convex, negative concave, 0 flat). The solid is the part of the cylinder below the
+ * top face and above the bottom face; ra must not exceed either radius (see lensParams). Each
+ * candidate surface crossing is kept only if it lies on that solid's boundary; the nearest with
+ * t > tmin wins.
  */
 export function hitLens(ra: number, tc: number, R1: number, R2: number, o: Vec3, d: Vec3, tmin: number): Hit | null {
   const c1 = tc / 2 - R1;
@@ -263,13 +286,13 @@ export function hitLens(ra: number, tc: number, R1: number, R2: number, o: Vec3,
     if (skip !== 1) {
       if (R1 === 0) { if (p[1] > tc / 2) return false; } else {
         const q = p[0] * p[0] + (p[1] - c1) * (p[1] - c1) + p[2] * p[2] - R1 * R1;
-        if (R1 > 0 ? q > 0 : q < 0 || p[1] > c1) return false;
+        if (R1 > 0 ? q > 0 && p[1] > c1 : q < 0 || p[1] > c1) return false;
       }
     }
     if (skip !== 2) {
       if (R2 === 0) { if (p[1] < -tc / 2) return false; } else {
         const q = p[0] * p[0] + (p[1] - c2) * (p[1] - c2) + p[2] * p[2] - R2 * R2;
-        if (R2 > 0 ? q > 0 : q < 0 || p[1] < c2) return false;
+        if (R2 > 0 ? q > 0 && p[1] < c2 : q < 0 || p[1] < c2) return false;
       }
     }
     return true;
@@ -386,7 +409,7 @@ export function hitCanonical(shape: Shape, planes: Plane[] | null, o: Vec3, d: V
       return { t, n: [0, 1, 0] };
     }
     case 'prism': case 'gem': return hitPolytope(planes ?? [], o, d, tmin);
-    case 'lens': return hitLens(shape.r, shape.t, shape.r1, shape.r2, o, d, tmin);
+    case 'lens': return hitLens(...lensParams(shape), o, d, tmin);
     case 'mesh': return null; // meshes are intersected through their BVH (see mesh.ts)
   }
 }

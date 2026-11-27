@@ -108,6 +108,9 @@ export interface RingOptions {
 }
 
 const RING_STEP = 46;
+let ringsHeld = 0;
+/** True while a ring is being dragged (the panel must not rebuild it then). */
+export const ringHeld = (): boolean => ringsHeld > 0;
 
 /** A lens ring. Values between stops are interpolated geometrically. */
 export function ring(o: RingOptions): HTMLElement {
@@ -150,7 +153,7 @@ export function ring(o: RingOptions): HTMLElement {
   let dragX = 0;
   let dragPos = 0;
   let dragging = false;
-  body.addEventListener('pointerdown', (e) => { dragging = true; dragX = e.clientX; dragPos = pos; body.setPointerCapture(e.pointerId); e.preventDefault(); });
+  body.addEventListener('pointerdown', (e) => { dragging = true; ringsHeld++; dragX = e.clientX; dragPos = pos; body.setPointerCapture(e.pointerId); body.focus({ preventScroll: true }); e.preventDefault(); });
   body.addEventListener('pointermove', (e) => {
     if (!dragging) return;
     pos = Math.min(n - 1, Math.max(0, dragPos - (e.clientX - dragX) / RING_STEP));
@@ -158,7 +161,7 @@ export function ring(o: RingOptions): HTMLElement {
     place();
     emit(false);
   });
-  const end = () => { if (dragging) { dragging = false; emit(false); emit(true); } };
+  const end = () => { if (dragging) { dragging = false; ringsHeld = Math.max(0, ringsHeld - 1); emit(false); emit(true); } };
   body.addEventListener('pointerup', end);
   body.addEventListener('pointercancel', end);
   body.addEventListener('keydown', (e) => {
@@ -171,6 +174,8 @@ export function ring(o: RingOptions): HTMLElement {
     emit(true);
   });
   body.addEventListener('wheel', (e) => {
+    // Only a ring the visitor has clicked turns with the wheel; otherwise the panel scrolls.
+    if (document.activeElement !== body) return;
     e.preventDefault();
     pos = Math.min(n - 1, Math.max(0, pos + Math.sign(e.deltaY) / (o.detents || 3)));
     place();

@@ -2,7 +2,7 @@
 // buffers, and advances the picture a few tiles at a time so the page stays responsive on any
 // GPU.
 import { LIGHT_W, MAT_W, OBJ_W, PLANE_W, type Packed } from '../core/pack';
-import { type Camera, SENSOR_HEIGHT_MM } from '../core/scene';
+import { type Camera, MIN_ASPECT, SENSOR_HEIGHT_MM } from '../core/scene';
 import { NL, NS } from '../core/spectrum';
 import { type Vec3, cross, norm, sub } from '../core/vec';
 import { Program, createFramebuffer, createTexture, dataTexture } from './gl';
@@ -36,8 +36,9 @@ export function cameraFrame(cam: Camera, aspect: number): CameraFrame {
   let right = norm(cross(forward, [0, 1, 0]));
   if (!(Math.hypot(...right) > 0.5)) right = [1, 0, 0];
   const up = cross(right, forward);
-  // The 24 mm side of the frame is the picture's shorter side.
-  const tanHalf = (SENSOR_HEIGHT_MM / 2 / cam.focal) * Math.max(1, 1 / aspect);
+  // The frame is 24 mm tall, and never narrower than 30 mm: on a square or upright picture
+  // the view grows taller instead of cutting the sides off a scene composed for a wide one.
+  const tanHalf = (SENSOR_HEIGHT_MM / 2 / cam.focal) * Math.max(1, MIN_ASPECT / aspect);
   const lensRadius = cam.fstop > 0 ? cam.focal / 1000 / (2 * cam.fstop) : 0;
   return { pos: cam.pos, right, up, forward, tanHalf, lensRadius, focus: Math.max(0.01, cam.focus), blades: cam.blades };
 }

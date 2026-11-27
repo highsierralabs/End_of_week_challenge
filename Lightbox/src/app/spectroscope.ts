@@ -4,7 +4,7 @@
 import type { GasName } from '../core/scene';
 import { CMF, LAM0, LAM1, NS, glassIndex, lamAt, xyzToLinearRgb } from '../core/spectrum';
 import { prismDeviation } from '../core/scenes';
-import { GRATING_LINES, SPECTRO_GRATING, SPECTRO_HALF, SPECTRO_TUBE, spectroscopeScene } from '../core/tourscenes';
+import { GRATING_LINES, SPECTRO_GRATING, SPECTRO_HALF, SPECTRO_TUBE, spectroCamera, spectroscopeScene } from '../core/tourscenes';
 import { objectTransform } from '../core/pack';
 import { hitPolytope, shapePlanes } from '../core/shapes';
 import { type Vec3, add, dot, invertAffine, mul, norm, sub, xformDir, xformPoint } from '../core/vec';
@@ -36,13 +36,38 @@ export class Spectroscope {
   private verdict = '';
   private verdictGood = false;
   private score = { right: 0, asked: 0 };
+  private guessed = false;
+  private timer = 0;
+  private active = false;
 
   /** Picture position of a world point; set by the app. */
   project: ((p: Vec3) => { x: number; y: number } | null) | null = null;
 
   constructor(private readonly root: HTMLElement, private readonly store: Store) {}
 
-  async enter(): Promise<void> { await this.reload(); }
+  async enter(): Promise<void> {
+    this.active = true;
+    await this.reload();
+  }
+
+  /** The visitor left the mode: stop anything still pending. */
+  leave(): void {
+    this.active = false;
+    clearTimeout(this.timer);
+    this.verdictGood = false;
+  }
+
+  private aspect(): number {
+    const t = this.store.view.tracer;
+    return t.width / Math.max(1, t.height);
+  }
+
+  /** The picture changed shape: refit the lens so the whole spectrum stays in it. */
+  fit(): void {
+    if (!this.active || !this.store.scene) return;
+    Object.assign(this.store.scene.camera, spectroCamera(this.disperser, this.aspect()));
+    this.store.cameraChanged();
+  }
 
   /**
    * A world point in the direction where the tube's lower end appears in light of one
@@ -135,6 +160,7 @@ export class Spectroscope {
     g.lineWidth = 1;
     g.font = '11px ui-monospace, Menlo, Consolas, monospace';
     g.textAlign = 'center';
+    let lastLabel = -1e9;
     for (let nm = 400; nm <= 720; nm += 10) {
       const q = this.imagePoint(nm);
       const p = q && this.project(q);
@@ -145,7 +171,8 @@ export class Spectroscope {
       g.moveTo(Math.round(p.x) + 0.5, y);
       g.lineTo(Math.round(p.x) + 0.5, y + (major ? 9 : 4));
       g.stroke();
-      if (major) g.fillText(String(nm), p.x, y + 22);
+      // Where the scale is cramped (the prism's red end on a narrow screen) skip labels.
+      if (major && Math.abs(p.x - lastLabel) >= 30) { g.fillText(String(nm), p.x, y + 22); lastLabel = p.x; }
     }
     const endPoint = this.imagePoint(this.disperser === 'grating' ? 715 : 450);
     const end = endPoint && this.project(endPoint);
@@ -155,7 +182,7 @@ export class Spectroscope {
 
   private async reload(): Promise<void> {
     this.render();
-    await this.store.load(spectroscopeScene(this.mystery ?? this.gas, this.disperser));
+    await this.store.load(spectroscopeScene(this.mystery ?? this.gas, this.disperser, this.aspect()));
   }
 
   private chart(gas: GasName): HTMLCanvasElement {
@@ -194,18 +221,23 @@ export class Spectroscope {
     const quizzing = this.mystery !== null;
     this.root.append(h('h2', { text: 'Spectroscope' }));
     if (!quizzing) {
-      const lines = (LINES[this.gas] ?? []).slice().sort((a, b) => b[1] - a[1]).slice(0, 6).sort((a, b) => a[0] - b[0]);
+      // The strongest lines on the scale, with close pairs (the sodium doublet) shown once.
+      const lines: [number, number][] = [];
+      for (const l of (LINES[this.gas] ?? []).filter((x) => x[0] >= 400 && x[0] <= 700).sort((a, b) => b[1] - a[1])) {
+        if (lines.length < 6 && !lines.some((k) => Math.abs(k[0] - l[0]) < 1)) lines.push(l);
+      }
+      lines.sort((a, b) => a[0] - b[0]);
       this.root.append(
         h('p', { text: this.disperser === 'grating'
           ? 'A thin tube of glowing gas, seen through a grating of 1,200 lines per millimetre held in front of the lens. The grating turns each wavelength through its own angle, so every emission line makes a separate image of the tube.'
-          : 'A thin tube of glowing gas, seen through a 60° prism of dense flint glass. Blue is bent more than red, so every emission line makes a separate image of the tube. A prism spreads the blue end more than the red.' }),
+          : 'A thin tube of glowing gas, seen through a 60\u00b0 prism of dense flint glass. Blue is bent more than red, so every emission line makes a separate image of the tube. A prism spreads the blue end more than the red, and the faint extra images are reflections inside it, as in a real one.' }),
         this.gasButtons((g) => { this.gas = g; void this.reload(); }, this.gas),
         this.chart(this.gas),
         h('p', { class: 'lb-lines', text: `Strongest lines: ${lines.map((l) => `${l[0].toFixed(1)}`).join(', ')} nm` }),
         h('div', { class: 'lb-tour-nav' },
           button(this.disperser === 'grating' ? 'Use a prism instead' : 'Use a grating instead', () => { this.disperser = this.disperser === 'grating' ? 'prism' : 'grating'; void this.reload(); }),
           button('Mystery lamp', () => { this.pickMystery(); }, 'primary')),
-        h('p', { class: 'lb-note', text: 'Line positions are NIST’s measured wavelengths. Line strengths come from NIST transition probabilities and a single assumed excitation temperature, so they are approximate, most of all for krypton and xenon. The scale in the picture is computed from the grating equation.' }),
+        h('p', { class: 'lb-note', text: 'Line positions are NIST’s measured wavelengths. Line strengths come from NIST transition probabilities and a single assumed excitation temperature, so they are approximate, most of all for krypton and xenon. The scale in the picture is computed, from the grating equation or by tracing rays through the prism.' }),
       );
     } else {
       this.root.append(
@@ -213,7 +245,7 @@ export class Spectroscope {
         h('div', { class: 'lb-quiz' },
           this.gasButtons((g) => this.answer(g), null),
           h('p', { class: `lb-verdict ${this.verdict ? (this.verdictGood ? 'good' : 'bad') : ''}`, text: this.verdict || ' ' })),
-        h('p', { class: 'lb-lines', text: this.score.asked ? `${this.score.right} right of ${this.score.asked}` : 'Hint: hydrogen has four lines; sodium has one; neon crowds the red.' }),
+        h('p', { class: 'lb-lines', text: this.score.asked ? `${this.score.right} of ${this.score.asked} lamps named at the first guess` : 'Hint: hydrogen has a few well-separated lines; sodium is nearly all one yellow line; neon crowds the red.' }),
         h('div', { class: 'lb-tour-nav' }, button('Back to the lamps', () => { this.mystery = null; this.verdict = ''; void this.reload(); })),
       );
     }
@@ -222,21 +254,23 @@ export class Spectroscope {
   private pickMystery(): void {
     const pool = GASES.map((g) => g[0]).filter((g) => g !== this.mystery);
     this.mystery = pool[Math.floor(Math.random() * pool.length)]!;
+    this.guessed = false;
     this.verdict = '';
     void this.reload();
   }
 
   private answer(g: GasName): void {
     if (!this.mystery || this.verdictGood) return;
-    this.score.asked++;
+    // A lamp counts once: right only if the first guess was.
     const name = (x: GasName) => GASES.find((p) => p[0] === x)![1].toLowerCase();
+    if (!this.guessed) { this.score.asked++; if (g === this.mystery) this.score.right++; }
+    this.guessed = true;
     if (g === this.mystery) {
-      this.score.right++;
       this.verdict = `Yes: ${name(g)}.`;
       this.verdictGood = true;
       this.render();
       this.gas = g;
-      window.setTimeout(() => { this.verdictGood = false; this.pickMystery(); }, 1600);
+      this.timer = window.setTimeout(() => { this.verdictGood = false; if (this.active && this.mystery !== null) this.pickMystery(); }, 1600);
     } else {
       this.verdict = `Not ${name(g)}. Look again.`;
       this.verdictGood = false;

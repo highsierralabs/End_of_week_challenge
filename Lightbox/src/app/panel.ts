@@ -1,9 +1,9 @@
 // The inspector: Scene (objects and the selected object's shape, place and material), Camera
 // (the lens rings) and Darkroom (exposure, colour, glare, export).
 import { type GasName, type GlassName, type LightSpectrum, type Material, type MetalName, type SceneObject, type Shape, type ToneCurve, newId } from '../core/scene';
-import { restHeight } from '../core/shapes';
+import { REST_GAP, lensParams, restHeight } from '../core/shapes';
 import { glassIndex } from '../core/spectrum';
-import { button, clear, group, h, ring, select, slider, swatches, toggle } from './controls';
+import { button, clear, group, h, ring, ringHeld, select, slider, swatches, toggle } from './controls';
 import type { Interaction } from './interact';
 import type { Store } from './store';
 
@@ -12,7 +12,7 @@ const GLASS_LABEL: Record<GlassName, string> = { bk7: 'Crown glass (BK7)', silic
 const METAL_LABEL: Record<MetalName, string> = { gold: 'Gold', silver: 'Silver', copper: 'Copper', aluminium: 'Aluminium' };
 const MATERIAL_LABEL: Record<Material['kind'], string> = { diffuse: 'Matte', plastic: 'Glossy', metal: 'Metal', mirror: 'Mirror', glass: 'Glass', light: 'Light', beam: 'Beam', grating: 'Grating' };
 
-const mm = (v: number): string => (v < 1 ? `${Math.round(v * 1000)} mm` : `${v.toFixed(2)} m`);
+const mm = (v: number): string => (Math.abs(v) < 1 ? `${Math.round(v * 1000)} mm` : `${v.toFixed(2)} m`);
 const deg = (v: number): string => `${Math.round(v)}°`;
 
 type SpectrumChoice = 'warm' | 'day' | 'd65' | 'laser' | 'led' | `gas:${GasName}`;
@@ -41,12 +41,12 @@ function defaultMaterial(kind: Material['kind'], old: Material): Material {
     case 'mirror': return { kind };
     case 'glass': return { kind, glass: 'bk7' };
     case 'light': return { kind, spectrum, lumens: 'lumens' in old ? old.lumens : 800 };
-    case 'beam': return { kind, spectrum, lumens: 'lumens' in old ? old.lumens : 300, spread: 3 };
+    case 'beam': return { kind, spectrum, lumens: 'lumens' in old ? Math.min(old.lumens, 600) : 300, spread: 15 };
     case 'grating': return { kind, linesPerMm: 600 };
   }
 }
 
-interface AddItem { label: string; make: () => { name: string; shape: Shape; material: Material; lift?: number; rot?: [number, number, number] } }
+interface AddItem { label: string; make: () => { name: string; shape: Shape; material: Material; lift?: number; dx?: number; rot?: [number, number, number]; note?: string } }
 const GLASS: Material = { kind: 'glass', glass: 'bk7' };
 const ADD: AddItem[] = [
   { label: 'Sphere', make: () => ({ name: 'Sphere', shape: { kind: 'sphere', r: 0.09 }, material: GLASS }) },
@@ -63,8 +63,8 @@ const ADD: AddItem[] = [
   { label: 'Bulb', make: () => ({ name: 'Bulb', shape: { kind: 'sphere', r: 0.03 }, material: { kind: 'light', spectrum: { kind: 'blackbody', kelvin: 2800 }, lumens: 800 }, lift: 0.35 }) },
   { label: 'Softbox', make: () => ({ name: 'Softbox', shape: { kind: 'quad', half: [0.3, 0.2] }, material: { kind: 'light', spectrum: { kind: 'blackbody', kelvin: 5500 }, lumens: 2000 }, lift: 1.0, rot: [180, 0, 0] }) },
   { label: 'Gas tube', make: () => ({ name: 'Gas tube', shape: { kind: 'cylinder', r: 0.012, h: 0.25 }, material: { kind: 'light', spectrum: { kind: 'gas', gas: 'Ne' }, lumens: 300 }, lift: 0.3, rot: [0, 0, 90] }) },
-  { label: 'Spotlight', make: () => ({ name: 'Spotlight', shape: { kind: 'disc', r: 0.04 }, material: { kind: 'beam', spectrum: { kind: 'blackbody', kelvin: 5500 }, lumens: 600, spread: 12 }, lift: 0.9, rot: [180, 0, 0] }) },
-  { label: 'Laser', make: () => ({ name: 'Laser', shape: { kind: 'disc', r: 0.004 }, material: { kind: 'beam', spectrum: { kind: 'laser', nm: 633 }, lumens: 2, spread: 0.08 }, lift: 0.1, rot: [0, 0, -90] }) },
+  { label: 'Spotlight', make: () => ({ name: 'Spotlight', shape: { kind: 'disc', r: 0.04 }, material: { kind: 'beam', spectrum: { kind: 'blackbody', kelvin: 5500 }, lumens: 300, spread: 12 }, lift: 0.9, rot: [180, 0, 0] }) },
+  { label: 'Laser', make: () => ({ name: 'Laser', shape: { kind: 'disc', r: 0.004 }, material: { kind: 'beam', spectrum: { kind: 'laser', nm: 633 }, lumens: 1, spread: 0.08 }, lift: 0.3, dx: -0.5, rot: [0, 0, -120], note: 'The laser points down at the table: look for its red spot. In clear air the beam itself is invisible.' }) },
 ];
 
 export class Panel {
@@ -102,7 +102,7 @@ export class Panel {
 
   // ------------------------------------------------------------------ scene tab
   /** A slider bound to the scene: snapshot once per drag, apply while dragging. */
-  private bound(label: string, min: number, max: number, value: number, set: (v: number) => void, opts: { log?: boolean; step?: number; fmt?: (v: number) => string } = {}): HTMLElement {
+  private bound(label: string, min: number, max: number, value: number, set: (v: number) => void, opts: { log?: boolean; step?: number; fmt?: (v: number) => string } = {}, done?: () => void): HTMLElement {
     let armed = true;
     return slider({
       label, min, max, value, ...opts,
@@ -112,21 +112,33 @@ export class Panel {
         this.store.view.tracer.setScale(2);
         this.store.apply();
       },
-      onChange: () => { armed = true; this.store.view.tracer.setScale(1); },
+      onChange: () => { armed = true; this.store.view.tracer.setScale(1); done?.(); },
     });
   }
 
+  private added = 0;
+  /** A line to show the visitor (the app's toast). */
+  onNote: ((text: string) => void) | null = null;
   private add(item: AddItem): void {
     const m = item.make();
     this.store.snapshot();
     const cam = this.store.scene.camera;
+    // Successive additions step sideways so they do not land inside each other.
+    const step = (this.added++ % 5) - 2;
     const o: SceneObject = {
       id: newId(), name: m.name, shape: m.shape, material: JSON.parse(JSON.stringify(m.material)) as Material,
-      pos: [cam.target[0], restHeight(m.shape) + (m.lift ?? 0), cam.target[2] + 0.25], rot: m.rot ?? [0, 0, 0],
+      pos: [cam.target[0] + (m.dx ?? 0) + step * 0.13, restHeight(m.shape) + REST_GAP + (m.lift ?? 0), cam.target[2] + 0.25], rot: m.rot ?? [0, 0, 0],
     };
     if (m.shape.kind === 'gem') o.pos[1] = m.shape.r * 0.45;
     this.store.scene.objects.push(o);
-    void this.store.load(this.store.scene, true).then(() => this.store.select(o.id));
+    void this.store.load(this.store.scene, true).then(() => {
+      this.store.select(o.id);
+      const p = this.interaction.project(o.pos);
+      const c = this.store.view.canvas;
+      const outside = !p || p.x < 0 || p.y < 0 || p.x > c.clientWidth || p.y > c.clientHeight;
+      if (m.note) this.onNote?.(m.note);
+      else if (outside) this.onNote?.(`${m.name} added outside the picture: you will see its light. Orbit or move back to see the lamp itself.`);
+    });
   }
 
   private renderScene(): void {
@@ -142,7 +154,9 @@ export class Panel {
     addGrid.append(button('Your model…', () => this.onLoadFile?.(), 'ghost'));
     this.body.append(group('In the scene', list));
     if (o) this.body.append(this.objectEditor(o));
-    else this.body.append(h('p', { class: 'lb-note', text: 'Click an object in the picture to select it, drag it to move it (hold Shift to lift). Drag the background to orbit, scroll to move in, right-drag to pan. Double-click to focus.' }));
+    else this.body.append(h('p', { class: 'lb-note', text: window.matchMedia('(pointer: coarse)').matches
+      ? 'Tap an object in the picture to select it and drag it to move it. Drag the background to orbit, pinch to move in or out, drag with two fingers to pan. Double-tap to focus.'
+      : 'Click an object in the picture to select it, drag it to move it (hold Shift to lift). Drag the background to orbit, scroll to move in, right-drag to pan. Double-click to focus.' }));
     this.body.append(group('Add', addGrid));
     this.body.append(group('Room',
       this.bound('Surround', 0, 2000, s.scene.env.luminance, (v) => { s.scene.env.luminance = v; }, { step: 10, fmt: (v) => (v === 0 ? 'dark' : `${Math.round(v)} cd/m²`) }),
@@ -173,7 +187,7 @@ export class Panel {
     const s = this.store;
     const wrap = h('div', { class: 'lb-editor' });
     const name = h('input', { type: 'text', class: 'lb-name', value: o.name, maxlength: 40, 'aria-label': 'Name' });
-    name.addEventListener('change', () => { s.snapshot(); o.name = name.value.trim() || o.shape.kind; this.render(); });
+    name.addEventListener('change', () => { const v = name.value.trim(); if (!v) { name.value = o.name; return; } s.snapshot(); o.name = v; this.render(); });
     wrap.append(h('div', { class: 'lb-editor-head' }, name,
       button('Copy', () => {
         s.snapshot();
@@ -205,7 +219,7 @@ export class Panel {
       case 'quad': shape.push(size('Width', sh.half[0] * 2, (v) => { sh.half[0] = v / 2; }, 0.001, 8), size('Depth', sh.half[1] * 2, (v) => { sh.half[1] = v / 2; }, 0.001, 8)); break;
       case 'disc': shape.push(size('Radius', sh.r, (v) => { sh.r = v; }, 0.001)); break;
       case 'prism':
-        shape.push(this.bound('Sides', 3, 8, sh.sides, (v) => { sh.sides = Math.round(v); }, { step: 1 }));
+        shape.push(this.bound('Sides', 3, 8, sh.sides, (v) => { sh.sides = Math.round(v); }, { step: 1 }, () => this.render()));
         if (sh.sides <= 3) shape.push(this.bound('Apex angle', 20, 120, sh.apex, (v) => { sh.apex = v; }, { step: 1, fmt: deg }));
         shape.push(size('Size', sh.size, (v) => { sh.size = v; }), size('Length', sh.h * 2, (v) => { sh.h = v / 2; }));
         break;
@@ -223,7 +237,9 @@ export class Panel {
           const c2 = sh.r2 === 0 ? 0 : 1 / sh.r2;
           // Thick-lens lensmaker's equation; both faces count as positive when convex.
           const p = (n - 1) * (c1 + c2 - ((n - 1) * sh.t * c1 * c2) / n);
-          focal.textContent = Math.abs(p) < 1e-6 ? 'No focusing power.' : `Focal length ${mm(Math.abs(1 / p))} (${p > 0 ? 'converging' : 'diverging'}) in yellow light.`;
+          const usable = lensParams(sh)[0];
+          focal.textContent = (Math.abs(p) < 1e-6 ? 'No focusing power.' : `Focal length ${mm(Math.abs(1 / p))} (${p > 0 ? 'converging' : 'diverging'}) in yellow light.`)
+            + (usable < sh.r - 1e-6 ? ` Faces this curved cannot span the whole aperture; ${mm(usable)} of its radius is used.` : '');
         };
         shape.push(size('Aperture radius', sh.r, (v) => { sh.r = v; showFocal(); }, 0.01, 0.5), size('Thickness', sh.t, (v) => { sh.t = v; showFocal(); }, 0.002, 0.3),
           curve('Front face', sh.r1, (v) => { sh.r1 = v; }), curve('Back face', sh.r2, (v) => { sh.r2 = v; }), focal);
@@ -245,7 +261,7 @@ export class Panel {
     const kinds = (Object.keys(MATERIAL_LABEL) as Material['kind'][]).filter((k) => (k !== 'beam' && k !== 'grating') || flat);
     const rows: HTMLElement[] = [select('Made of', kinds.map((k) => [k, MATERIAL_LABEL[k]] as const), m.kind, (k) => { s.snapshot(); o.material = defaultMaterial(k, m); s.apply(); this.render(); })];
     const colour = (target: { color: [number, number, number] }) => swatches('Colour', target.color, (c) => { s.snapshot(); target.color = c; s.apply(); });
-    const rough = (target: { rough: number }) => this.bound('Roughness', 0, 1, target.rough, (v) => { target.rough = v; }, { step: 0.01 });
+    const rough = (target: { rough: number }) => this.bound('Roughness', 0, 1, target.rough, (v) => { target.rough = v; }, { step: 0.01, fmt: (v) => (v < 0.02 ? 'polished' : v.toFixed(2)) });
     if (m.kind === 'diffuse') rows.push(colour(m));
     else if (m.kind === 'plastic') rows.push(colour(m), rough(m));
     else if (m.kind === 'metal') {
@@ -277,8 +293,13 @@ export class Panel {
 
   // ------------------------------------------------------------------ camera tab
   private dofNote: HTMLElement | null = null;
+  private shownLens = '';
   private syncCamera(): void {
     if (this.dofNote) this.dofNote.textContent = this.dofText();
+    // The lens changed from outside the tab (a double-click focus, a dolly): redraw the rings.
+    const c = this.store.scene.camera;
+    const lens = `${c.focal.toFixed(2)}/${c.fstop.toFixed(3)}/${c.focus.toFixed(3)}`;
+    if (lens !== this.shownLens && !ringHeld() && !this.body.contains(document.activeElement)) this.render();
   }
   private dofText(): string {
     const c = this.store.scene.camera;
@@ -299,6 +320,7 @@ export class Panel {
     const cam = () => { this.interaction.previewScale = 2; s.view.tracer.setScale(2); s.cameraChanged(); };
     const done = () => { s.view.tracer.setScale(1); };
     this.dofNote = h('p', { class: 'lb-note', text: this.dofText() });
+    this.shownLens = `${c.focal.toFixed(2)}/${c.fstop.toFixed(3)}/${c.focus.toFixed(3)}`;
     const pinhole = c.fstop <= 0;
     this.body.append(group('Lens',
       ring({ label: 'Focal length', stops: [18, 24, 35, 50, 85, 135, 200], value: c.focal, fmt: (v) => `${Math.round(v)} mm`, tick: (v) => String(v), onInput: (v) => { c.focal = v; cam(); }, onChange: done }),
@@ -312,7 +334,7 @@ export class Panel {
       d.auto ? h('p', { class: 'lb-note', text: 'The meter picks the exposure. Turn it off to set shutter and ISO yourself: then stopping the lens down darkens the picture, as on a real camera.' }) : null,
       d.auto ? null : ring({ label: 'Shutter', stops: [1 / 1000, 1 / 500, 1 / 250, 1 / 125, 1 / 60, 1 / 30, 1 / 15, 1 / 8, 1 / 4, 1 / 2, 1, 2, 4], value: c.shutter, detents: 3, fmt: (v) => (v < 1 ? `1/${Math.round(1 / v)} s` : `${v.toFixed(v < 10 ? 1 : 0)} s`), tick: (v) => (v < 1 ? String(Math.round(1 / v)) : `${v}s`), onInput: (v) => { c.shutter = v; s.displayChanged(); } }),
       d.auto ? null : ring({ label: 'ISO', stops: [50, 100, 200, 400, 800, 1600, 3200, 6400, 12800], value: c.iso, detents: 3, fmt: (v) => `ISO ${Math.round(v)}`, tick: (v) => String(v), onInput: (v) => { c.iso = v; s.displayChanged(); } })));
-    this.body.append(h('p', { class: 'lb-note', text: 'Double-click anything in the picture to focus on it.' }));
+    this.body.append(h('p', { class: 'lb-note', text: window.matchMedia('(pointer: coarse)').matches ? 'Double-tap anything in the picture to focus on it.' : 'Double-click anything in the picture to focus on it. Click a ring, then use the arrow keys or the wheel for fine steps.' }));
   }
 
   // ------------------------------------------------------------------ darkroom tab

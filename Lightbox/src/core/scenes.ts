@@ -1,6 +1,6 @@
 // Built-in scenes. Lengths in metres; the table top is y = 0, the camera looks along -z.
 import { type Camera, type Material, type Rgb, type Scene, type SceneObject, type Shape, defaultCamera, defaultDarkroom, newId } from './scene';
-import { restHeight } from './shapes';
+import { REST_GAP, restHeight } from './shapes';
 import { glassIndex } from './spectrum';
 import type { Vec3 } from './vec';
 
@@ -12,7 +12,7 @@ export function obj(name: string, shape: Shape, material: Material, pos: Vec3, r
 
 /** Place a shape so it rests on the table at (x, z). */
 export function onTable(name: string, shape: Shape, material: Material, x: number, z: number, rot: Vec3 = [0, 0, 0]): SceneObject {
-  return obj(name, shape, material, [x, restHeight(shape), z], rot);
+  return obj(name, shape, material, [x, restHeight(shape) + REST_GAP, z], rot);
 }
 
 const matte = (color: Rgb): Material => ({ kind: 'diffuse', color });
@@ -74,8 +74,8 @@ export function newtonPrism(): Scene {
   const s = scene('Prism and beam', [
     ...backdrop([0.3, 0.3, 0.3], [0.16, 0.16, 0.17]),
     obj('Fill light', { kind: 'quad', half: [0.4, 0.4] }, lamp(4500, 110), [0, 1.6, 0.6], [180, 0, 0]),
-    obj('Slit lamp', { kind: 'quad', half: [0.035, 0.0025] }, { kind: 'beam', spectrum: { kind: 'blackbody', kelvin: 5600 }, lumens: 0.7, spread: 0.25 }, [-0.75, 0.06, 0], [0, 0, -90]),
-    obj('Prism', { kind: 'prism', sides: 3, apex: 60, size: 0.1, h: 0.06 }, glass('sf11'), [m.centre[0], 0.06, m.centre[1]], [90, m.turn, 0]),
+    obj('Slit lamp', { kind: 'quad', half: [0.035, 0.0025] }, { kind: 'beam', spectrum: { kind: 'blackbody', kelvin: 5600 }, lumens: 0.07, spread: 0.25 }, [-0.75, 0.06, 0], [0, 0, -90]),
+    obj('Prism', { kind: 'prism', sides: 3, apex: 60, size: 0.1, h: 0.06 }, glass('sf11'), [m.centre[0], 0.06 + REST_GAP, m.centre[1]], [90, m.turn, 0]),
     obj('Card', { kind: 'box', half: [0.3, 0.16, 0.004] }, matte([0.92, 0.92, 0.9]), [m.exit[0] + 0.8 * m.out[0], 0.16, m.exit[1] + 0.8 * m.out[1]], [0, (Math.atan2(-m.out[0], -m.out[1]) * 180) / Math.PI, 0]),
   ], { pos: [-0.4, 0.5, 0.62], target: [0.2, 0.1, -0.42], focus: 1.25, focal: 35 });
   s.bounces = 16;
@@ -112,15 +112,21 @@ export function glassware(): Scene {
   ], { pos: [0.05, 0.4, 1.35], target: [0.03, 0.13, 0], focus: 1.35, focal: 42, fstop: 5.6 });
 }
 
-/** A collimated beam through a lens, sliced by the table so the cone of light draws itself. */
-export function lensBench(): Scene {
-  return scene('Lens bench', [
+/**
+ * A ray box. Seven thin sheets of white light skim the table at a shallow angle, so each one
+ * draws its own path along the table top; a glass rod standing on end bends them in the plane
+ * of the table only, like the cylindrical lenses of a school optics kit.
+ */
+export function rayBox(): Scene {
+  const tilt = 1.15;
+  const rays = [-3, -2, -1, 0, 1, 2, 3].map((i) => obj(`Ray ${i + 4}`, { kind: 'quad', half: [0.012, 0.0012] },
+    { kind: 'beam', spectrum: { kind: 'blackbody', kelvin: 5600 }, lumens: 1.2, spread: 0.05 }, [-0.8, 0.0135, i * 0.03], [0, 0, -(90 + tilt)]));
+  return scene('Ray box', [
     ...backdrop([0.82, 0.82, 0.8], [0.2, 0.2, 0.21]),
-    obj('Fill light', { kind: 'quad', half: [0.4, 0.4] }, lamp(4500, 90), [0, 1.6, 0.4], [180, 0, 0]),
-    obj('Beam', { kind: 'disc', r: 0.075 }, { kind: 'beam', spectrum: { kind: 'blackbody', kelvin: 5600 }, lumens: 45, spread: 0.12 }, [-0.62, 0.012, 0], [0, 0, -90]),
-    obj('Lens', { kind: 'lens', r: 0.085, t: 0.04, r1: 0.22, r2: 0.22 }, glass('sf11'), [-0.2, 0.012, 0], [0, 0, 90]),
-    obj('Card', { kind: 'box', half: [0.004, 0.11, 0.14] }, matte([0.92, 0.92, 0.9]), [0.42, 0.11, 0]),
-  ], { pos: [0.0, 1.05, 0.75], target: [-0.02, 0, 0], focus: 1.25, focal: 40, fstop: 0 }, { darkroom: { ...defaultDarkroom(), ev: -0.4 } });
+    obj('Fill light', { kind: 'quad', half: [0.4, 0.4] }, lamp(4500, 60), [0, 1.6, 0.4], [180, 0, 0]),
+    ...rays,
+    onTable('Glass rod', { kind: 'cylinder', r: 0.11, h: 0.05 }, glass('sf11'), -0.3, 0),
+  ], { pos: [-0.08, 1.15, 0.5], target: [-0.1, 0, 0], focus: 1.25, focal: 40, fstop: 0 }, { darkroom: { ...defaultDarkroom(), ev: -0.4 } });
 }
 
 export function cornellBox(): Scene {
@@ -156,7 +162,7 @@ export const SCENES: SceneEntry[] = [
   { id: 'prism', title: 'Prism and beam', make: newtonPrism },
   { id: 'gems', title: 'Gems', make: gems },
   { id: 'glass', title: 'Glassware', make: glassware },
-  { id: 'lens', title: 'Lens bench', make: lensBench },
+  { id: 'lens', title: 'Ray box', make: rayBox },
   { id: 'tubes', title: 'Gas tubes', make: gasTubes },
   { id: 'box', title: 'Box', make: cornellBox },
 ];

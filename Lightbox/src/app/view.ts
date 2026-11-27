@@ -35,6 +35,7 @@ export class View {
   private raf = 0;
   private dirtyDisplay = true;
   private slowFrames = 0;
+  private everMetered = false;
 
   /** True when the GPU needs several animation frames for one sample of the picture. */
   get slow(): boolean { return this.tracer.tileSize < 256 || this.tilesPerFrame < this.tracer.tilesPerSweep * 0.5; }
@@ -94,6 +95,7 @@ export class View {
     const target = this.meterMode === 'peak' ? 0.2 / Math.max(1e-3, m.peak) : 0.16 / Math.max(1e-3, Math.exp(m.logMean));
     this.autoExposure = this.metered < 0 && t.frame < 3 && this.autoExposure !== 1 ? 0.5 * (this.autoExposure + target) : target;
     this.metered = Math.max(1, t.frame);
+    this.everMetered = true;
     this.dirtyDisplay = true;
   }
 
@@ -116,6 +118,8 @@ export class View {
       this.dirtyDisplay = true;
     }
     if (this.scene.darkroom.auto) this.meter();
+    // The first frames of a metered picture wait for the meter, so it never flashes white.
+    if (this.scene.darkroom.auto && !this.everMetered && t.frame < 2) return;
     if (this.dirtyDisplay) {
       t.present(this.look());
       this.dirtyDisplay = false;

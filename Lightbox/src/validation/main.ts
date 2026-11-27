@@ -12,7 +12,7 @@ import { CMF, NS, cameraMatrix, glassIndex, integrate, lamAt, lightSpectrum, srg
 import { type Vec3, add, cross, dot, invertAffine, mul, norm, sub, xformDir, xformPoint } from '../core/vec';
 import { Tracer, cameraFrame } from '../gpu/tracer';
 
-interface Row { what: string; measured: number; expected: number; unit: string; tol: number; digits?: number; abs?: boolean }
+interface Row { what: string; measured: number; expected: number; unit: string; tol: number; digits?: number; abs?: boolean; /** A figure reported for reference, not a comparison. */ info?: boolean }
 interface Result { id: string; title: string; note: string; rows: Row[]; image: string; seconds: number; samples: number }
 
 declare global {
@@ -164,7 +164,7 @@ const checks: Check[] = [
         obj('Table', { kind: 'quad', half: [6, 6] }, white(), [0, 0, 0]),
         obj('Panel', { kind: 'quad', half: [a, b] }, { kind: 'light', spectrum: D65, lumens: 1000 }, [0, hgt, 0], [180, 0, 0]),
       ], { pos: [1.7, 1.1, 1.3], target: [0.3, 0, 0.08], focal: 50 });
-      await trace(s, 1200, 384);
+      await trace(s, 3000, 384);
       const pts: [string, number, number][] = [['under the centre', 0, 0], ['under a corner', a, b], ['0.8 m to the side', 0.8, 0]];
       const rows = pts.map(([name, x, z]): Row => {
         const p = pixel(s, 384, [x, 0, z]);
@@ -309,14 +309,14 @@ const checks: Check[] = [
       }
       const c = 1 / R;
       const power = (n - 1) * (2 * c - ((n - 1) * t * c * c) / n);
-      rows.push({ what: 'Paraxial focal length (lensmaker’s equation, for reference)', measured: 1000 / power, expected: 1000 / power, unit: 'mm', tol: 1, digits: 1 });
+      rows.push({ what: 'Paraxial focal length by the lensmaker\u2019s equation', measured: 1000 / power, expected: 1000 / power, unit: 'mm', tol: 1, digits: 1, info: true });
       return { rows, image };
     },
   },
   {
     id: 'two-tracers',
     title: 'Two tracers, one answer',
-    note: 'A glass ball under a small lamp throws a caustic. With the photon pass on, the photons carry the caustic and the path tracer carries everything else; with it off, the path tracer carries all of it. The total light in the picture must be the same either way.',
+    note: 'A glass ball under a small lamp throws a caustic. With the photon pass on, the photons carry the caustic and the path tracer carries everything else; with it off, the path tracer carries all of it. The comparison is made on the caustic itself (the brightest 12 \u00d7 12 pixel block, where photons carry most of the light) and on the whole picture.',
     run: async () => {
       const s = base([
         obj('Table', { kind: 'quad', half: [3, 3] }, white(), [0, 0, 0]),
@@ -324,17 +324,114 @@ const checks: Check[] = [
         obj('Lamp', { kind: 'sphere', r: 0.03 }, { kind: 'light', spectrum: D65, lumens: 1000 }, [-0.3, 0.6, 0]),
       ], { pos: [0.5, 0.9, 0.9], target: [0.05, 0, 0], focal: 50 }, { bounces: 16 });
       await trace(s, 800, 256, true);
+      const lum = tracer.luminance(0, 0, 256, 256);
+      // Find the caustic: the 12 x 12 block with the most light.
+      let best = -1;
+      let bx = 0;
+      let by = 0;
+      for (let y = 0; y + 12 <= 256; y += 3) {
+        for (let x = 0; x + 12 <= 256; x += 3) {
+          let sum = 0;
+          for (let j = 0; j < 12; j++) for (let i = 0; i < 12; i++) sum += lum[(y + j) * 256 + x + i]!;
+          if (sum > best) { best = sum; bx = x; by = y; }
+        }
+      }
+      const block = tracer.measure(bx, by, 12, 12);
       const both = tracer.measure(0, 0, 256, 256);
       const image = snapshot();
-      const withLt = both.pt[1] + both.lt[1];
-      await trace(s, 3200, 256, false);
+      await trace(s, 12000, 256, false);
+      const blockAlone = tracer.measure(bx, by, 12, 12);
       const alone = tracer.measure(0, 0, 256, 256);
       return {
         rows: [
-          { what: 'Mean luminance, photon pass on', measured: withLt, expected: alone.pt[1], unit: 'cd/m²', tol: 0.015 },
-          { what: 'Share carried by photons', measured: (100 * both.lt[1]) / withLt, expected: (100 * both.lt[1]) / withLt, unit: '%', tol: 1, digits: 1 },
+          { what: 'The caustic, photon pass on', measured: block.pt[1] + block.lt[1], expected: blockAlone.pt[1], unit: 'cd/m\u00b2', tol: 0.03 },
+          { what: 'Whole picture, photon pass on', measured: both.pt[1] + both.lt[1], expected: alone.pt[1], unit: 'cd/m\u00b2', tol: 0.01 },
+          { what: 'Share of the caustic carried by photons', measured: (100 * block.lt[1]) / (block.pt[1] + block.lt[1]), expected: 0, unit: '%', tol: 1, digits: 1, info: true },
         ],
         image,
+      };
+    },
+  },
+  {
+    id: 'inside-glass',
+    title: 'A lamp inside a glass ball',
+    note: 'Radiance is not conserved when light crosses into glass; radiance divided by the square of the index is. A lamp at the centre of a crown-glass ball must therefore look larger and dimmer from outside: its luminance through the glass is the transmitted fraction over n\u00b2. The light it throws on the table, carried by photons or found by the path tracer alone, must agree, and follows the inverse-square law times the transmission.',
+    run: async () => {
+      const r = 0.02;
+      const Ls = 1000 / (4 * Math.PI * Math.PI * r * r);
+      const spec = lightSpectrum(D65);
+      const wT = new Float32Array(NS);
+      const wTn = new Float32Array(NS);
+      for (let i = 0; i < NS; i++) {
+        const n = glassIndex('bk7', lamAt(i));
+        const T = 1 - ((n - 1) / (n + 1)) ** 2;
+        wT[i] = spec[i]! * T;
+        wTn[i] = (spec[i]! * T) / (n * n);
+      }
+      const objects = [
+        obj('Table', { kind: 'quad', half: [3, 3] }, white(), [0, 0, 0]),
+        obj('Lamp', { kind: 'sphere', r }, { kind: 'light', spectrum: D65, lumens: 1000 }, [0, 0.3, 0]),
+        obj('Ball', { kind: 'sphere', r: 0.1 }, { kind: 'glass', glass: 'bk7' }, [0, 0.3, 0]),
+      ];
+      const look = base(objects, { pos: [0, 0.3, 1], target: [0, 0.3, 0], focal: 200 }, { bounces: 12 });
+      await trace(look, 600);
+      const seen = meanY(128, 128, 8);
+      const image = snapshotPeak();
+      const floor = base(objects, { pos: [1.3, 1.0, 0.9], target: [0.6, 0, 0], focal: 50 }, { bounces: 12 });
+      const at = pixel(floor, 256, [0.6, 0, 0]);
+      await trace(floor, 400, 256, true);
+      const on = meanY(at[0], at[1], 6);
+      const onWide = meanY(at[0], at[1], 40);
+      // Alone, the path tracer finds this lamp about once in a thousand tries, so its answer
+      // is averaged over a much wider patch.
+      await trace(floor, 12000, 256, false);
+      const offWide = meanY(at[0], at[1], 40);
+      const rho = srgbToLinear(0.8);
+      const law = (rho / Math.PI) * (1000 / (4 * Math.PI)) * 0.3 / (0.3 * 0.3 + 0.6 * 0.6) ** 1.5 * integrate(wT, CMF[1]);
+      return {
+        rows: [
+          { what: 'Lamp seen through the glass, over its own luminance', measured: seen / Ls, expected: integrate(wTn, CMF[1]), unit: '', tol: 0.01, digits: 4 },
+          { what: 'Table around 0.6 m away, photons on (expected: path tracer alone)', measured: onWide, expected: offWide, unit: 'cd/m\u00b2', tol: 0.02 },
+          { what: 'Table 0.6 m away, against inverse square \u00d7 transmission', measured: on, expected: law, unit: 'cd/m\u00b2', tol: 0.02 },
+        ],
+        image,
+      };
+    },
+  },
+  {
+    id: 'beam',
+    title: 'A spotlight, bare and through a window',
+    note: 'A 100 lm beam with a 5\u00b0 half-angle from a 40 mm disc, 1 m above the table. On the axis the whole disc is visible inside the cone, so the irradiance is the disc\u2019s radiance times its projected solid angle. Then a 20 mm pane of crown glass is put in the beam: all the light now arrives as photons, and must be the bare value times the pane\u2019s transmission with its internal reflections, (1 \u2212 R)/(1 + R), and times a little more because a pane of thickness t brings the source optically closer by t(1 \u2212 1/n).',
+    run: async () => {
+      const [a, half, lumens] = [0.02, 5, 100];
+      const rho = srgbToLinear(0.5);
+      const s2 = Math.sin((half * Math.PI) / 180) ** 2;
+      const bare = (rho / Math.PI) * lumens / (Math.PI * (a * a + 1) * s2);
+      const spec = lightSpectrum(D65);
+      const w = new Float32Array(NS);
+      const thick = 0.02;
+      for (let i = 0; i < NS; i++) {
+        const n = glassIndex('bk7', lamAt(i));
+        const R = ((n - 1) / (n + 1)) ** 2;
+        // Seen through the pane the source is closer by t (1 - 1/n), which raises the irradiance.
+        const d = 1 - thick * (1 - 1 / n);
+        w[i] = ((spec[i]! * (1 - R)) / (1 + R)) * ((a * a + 1) / (a * a + d * d));
+      }
+      const make = (pane: boolean): Scene => base([
+        obj('Table', { kind: 'quad', half: [3, 3] }, white(0.5), [0, 0, 0]),
+        obj('Spot', { kind: 'disc', r: a }, { kind: 'beam', spectrum: D65, lumens, spread: half }, [0, 1, 0], [180, 0, 0]),
+        ...(pane ? [obj('Pane', { kind: 'box', half: [0.2, thick / 2, 0.2] }, { kind: 'glass', glass: 'bk7' }, [0, 0.5, 0])] : []),
+      ], { pos: [0.7, 0.42, 0.5], target: [0, 0, 0], focal: 85 }, { bounces: 12 });
+      await trace(make(false), 300);
+      const direct = meanY(128, 128, 6);
+      await trace(make(true), 600);
+      const through = meanY(128, 128, 6);
+      return {
+        rows: [
+          { what: 'Table at the centre of the bare beam', measured: direct, expected: bare, unit: 'cd/m\u00b2', tol: 0.015 },
+          { what: 'The same through the pane (photons)', measured: through, expected: bare * integrate(w, CMF[1]), unit: 'cd/m\u00b2', tol: 0.02 },
+        ],
+        image: snapshot(),
       };
     },
   },
@@ -359,7 +456,7 @@ const checks: Check[] = [
       return {
         rows: [
           { what: 'Mean luminance of the reflected patch, photons on', measured: on, expected: alone, unit: 'cd/m\u00b2', tol: 0.025 },
-          { what: 'Gather radius after 1,000 sweeps (for reference)', measured: radius, expected: radius, unit: 'mm', tol: 1, digits: 2 },
+          { what: 'Gather radius after 1,000 sweeps', measured: radius, expected: radius, unit: 'mm', tol: 1, digits: 2, info: true },
         ],
         image,
       };
@@ -380,7 +477,7 @@ const checks: Check[] = [
       ];
       for (const [name, spectrum, x, y] of cases) {
         const s = base([obj('Lamp', { kind: 'quad', half: [1, 1] }, { kind: 'light', spectrum, lumens: 4 * Math.PI * 100 }, [0, 0, 0], [90, 0, 0])], { pos: [0, 0, 1], target: [0, 0, 0], focal: 50 });
-        await trace(s, 300, 128);
+        await trace(s, 1200, 128);
         const m = meanXYZ(64, 64, 60);
         const sum = m[0] + m[1] + m[2];
         rows.push({ what: `${name}: x`, measured: m[0] / sum, expected: x, unit: '', tol: 0.0015, abs: true, digits: 4 });
@@ -414,24 +511,28 @@ const checks: Check[] = [
   {
     id: 'defocus',
     title: 'Depth of field: the size of a blur disc',
-    note: 'A point of light 1 m away, seen by a 50 mm lens at f/2 focused at 0.5 m. A thin lens of aperture radius a focused at s spreads a point at distance d into a disc of angular radius a·|d − s| / (d·s). The disc’s radius is measured from its lit area.',
+    note: 'A point of light 1 m away, seen by a 50 mm lens at f/2 focused at 0.5 m. A thin lens of aperture radius a focused at s spreads a point at distance d into a disc of angular radius a\u00b7|d \u2212 s| / (d\u00b7s). The disc\u2019s radius is taken from the second moment of the light in the picture (a uniform disc of radius R has mean square radius R\u00b2/2), after removing the small contributions of the source\u2019s own size and of the pixels.',
     run: async () => {
-      const [d, sFocus, r] = [1, 0.5, 0.003];
+      const [d, sFocus, r] = [1, 0.5, 0.002];
       const s = base([obj('Point', { kind: 'sphere', r }, { kind: 'light', spectrum: D65, lumens: 1 }, [0, 0, -d])], { pos: [0, 0, 0], target: [0, 0, -1], focal: 50, fstop: 2, focus: sFocus });
-      await trace(s, 600, 512);
+      await trace(s, 2400, 512);
       const lum = tracer.luminance(0, 0, 512, 512);
-      let peak = 0;
-      for (const v of lum) peak = Math.max(peak, v);
-      // The disc is uniform, so its median brightness sets a robust threshold.
-      const litVals = Array.from(lum).filter((v) => v > 0.02 * peak).sort((p, q) => p - q);
-      const level = litVals[Math.floor(litVals.length / 2)] ?? 0;
-      let area = 0;
-      for (const v of lum) if (v > 0.5 * level) area++;
+      let sum = 0;
+      let cx = 0;
+      let cy = 0;
+      for (let i = 0; i < lum.length; i++) { sum += lum[i]!; cx += lum[i]! * ((i % 512) + 0.5); cy += lum[i]! * (Math.floor(i / 512) + 0.5); }
+      cx /= sum;
+      cy /= sum;
+      let m2 = 0;
+      for (let i = 0; i < lum.length; i++) m2 += lum[i]! * (((i % 512) + 0.5 - cx) ** 2 + (Math.floor(i / 512) + 0.5 - cy) ** 2);
+      m2 /= sum;
       const f = cameraFrame(s.camera, 1);
       const pxPerTan = 512 / (2 * f.tanHalf);
-      // Measured at half the plateau's brightness, where the source's own size cancels.
+      const src = (r / d) * pxPerTan;
+      // Mean square radius = R^2/2 (blur) + src^2/2 (source disc) + 1/6 (square pixels).
+      const measured = Math.sqrt(Math.max(0, 2 * (m2 - 1 / 6) - src * src));
       const expected = ((f.lensRadius * Math.abs(d - sFocus)) / (d * sFocus)) * pxPerTan;
-      return { rows: [{ what: 'Blur disc radius', measured: Math.sqrt(area / Math.PI), expected, unit: 'px', tol: 0.04 }], image: snapshotPeak() };
+      return { rows: [{ what: 'Blur disc radius', measured, expected, unit: 'px', tol: 0.01 }], image: snapshotPeak() };
     },
   },
 ];
@@ -463,6 +564,7 @@ function uvSphere(nu: number, nv: number): TriMesh {
 const fmt = (v: number, digits: number): string => (Math.abs(v) >= 1000 ? v.toFixed(0) : Math.abs(v) >= 100 ? v.toFixed(Math.max(1, digits - 2)) : v.toFixed(digits));
 
 function passes(r: Row): boolean {
+  if (r.info) return true;
   if (!Number.isFinite(r.measured)) return false;
   return r.abs ? Math.abs(r.measured - r.expected) <= r.tol : Math.abs(r.measured / r.expected - 1) <= r.tol;
 }
@@ -497,6 +599,11 @@ function card(c: Check): { box: HTMLElement; fill: (r: Result | null, err?: stri
       for (const row of r.rows) {
         const tr = el('tr', passes(row) ? '' : 'lv-fail');
         const dg = row.digits ?? 2;
+        if (row.info) {
+          for (const t of [row.what, `${fmt(row.measured, dg)} ${row.unit}`, '', '', 'for reference']) tr.append(el('td', '', t));
+          table.append(tr);
+          continue;
+        }
         const diff = row.abs ? `${(row.measured - row.expected >= 0 ? '+' : '') + fmt(row.measured - row.expected, dg)} ${row.unit}` : `${((row.measured / row.expected - 1) * 100 >= 0 ? '+' : '') + ((row.measured / row.expected - 1) * 100).toFixed(2)}%`;
         const allow = row.abs ? `±${row.tol} ${row.unit}` : `±${(row.tol * 100).toFixed(1)}%`;
         for (const t of [row.what, `${fmt(row.measured, dg)} ${row.unit}`, `${fmt(row.expected, dg)} ${row.unit}`, diff, allow]) tr.append(el('td', '', t));
@@ -510,7 +617,7 @@ function card(c: Check): { box: HTMLElement; fill: (r: Result | null, err?: stri
 async function main(): Promise<void> {
   const intro = el('header', 'lv-intro');
   intro.append(el('h1', '', 'Lightbox: validation'));
-  intro.append(el('p', '', 'A renderer can look right and be wrong. Each check below renders a small scene on your GPU, now, reads back the light it accumulated, and compares it with a value known in advance: a closed-form result of radiometry or optics, a published CIE figure, or an exact double-precision trace of a single ray. Allowed differences are set by the sampling noise of each check; nothing here is precomputed.'));
+  intro.append(el('p', '', 'A renderer can look right and be wrong. Each check below renders a small scene on your GPU, now, reads back the light it accumulated, and compares it with a value known in advance: a closed-form result of radiometry or optics, a published CIE figure, an exact double-precision trace of a single ray, or the path tracer working alone where two techniques must agree. Allowed differences are set by the sampling noise of each check; nothing here is precomputed. Not covered: glossy and rough materials, meshes of glass, and the grating have no check with a known answer here.'));
   const summary = el('p', 'lv-summary', 'Compiling shaders…');
   const back = el('a', 'lb-btn', 'Back to Lightbox');
   back.href = './';
@@ -541,7 +648,7 @@ async function main(): Promise<void> {
       const r: Result = { id: c.id, title: c.title, note: c.note, rows: out.rows, image: out.image, seconds: (performance.now() - t0) / 1000, samples: tracer.frame };
       window.lightboxValidation.results.push(r);
       ui.fill(r);
-      for (const row of r.rows) { total++; if (passes(row)) passed++; }
+      for (const row of r.rows) { if (row.info) continue; total++; if (passes(row)) passed++; }
     } catch (e) {
       ui.fill(null, (e as Error).message);
       total++;

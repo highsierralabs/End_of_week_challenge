@@ -21,6 +21,7 @@ try {
   for (const r of v.results) {
     console.log(`${r.title}  (${r.seconds.toFixed(1)} s)`);
     for (const row of r.rows) {
+      if (row.info) { console.log(`  info ${row.what}: ${row.measured.toPrecision(5)} ${row.unit}`); continue; }
       const ok = row.abs ? Math.abs(row.measured - row.expected) <= row.tol : Math.abs(row.measured / row.expected - 1) <= row.tol;
       if (!ok) bad++;
       const diff = row.abs ? `${(row.measured - row.expected).toFixed(3)} ${row.unit}` : `${((row.measured / row.expected - 1) * 100).toFixed(2)}%`;

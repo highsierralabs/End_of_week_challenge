@@ -132,6 +132,14 @@ float hash(vec2 p) {
 }
 // Filmic shoulder and toe (the fit of Narkowicz 2015).
 vec3 film(vec3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
+// Half the film curve is applied per channel (bright lamps bleach toward white, as on film) and
+// half to the brightest channel alone (a saturated colour keeps its hue instead of jumping to
+// the nearest corner of the colour cube, which would turn a spectrum into flat bands).
+vec3 develop(vec3 c) {
+  float m = max(c.r, max(c.g, c.b));
+  vec3 keep = m > 1.0e-6 ? c * (film(vec3(m * 1.6)).r / m) : vec3(0.0);
+  return mix(film(c * 1.6), keep, 0.5);
+}
 vec3 srgb(vec3 c) { return mix(12.92 * c, 1.055 * pow(max(c, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c)); }
 
 void main() {
@@ -146,8 +154,8 @@ void main() {
     float y2 = dot(c, vec3(0.2126729, 0.7151522, 0.072175));
     c = y > 0.0 && y2 > 0.0 ? c * (y / y2) : vec3(0.0);
   }
-  if (uTone == 0) c = film(c * 1.6);
-  else if (uTone == 2) { c = film(c * 1.6); c = c * c * (3.0 - 2.0 * c); }
+  if (uTone == 0) c = develop(c);
+  else if (uTone == 2) { c = develop(c); c = c * c * (3.0 - 2.0 * c); }
   else if (uTone == 3) { float g = dot(c, vec3(0.2126729, 0.7151522, 0.072175)); c = film(vec3(g * 1.6)); }
   else c = clamp(c, 0.0, 1.0);
   c = srgb(c);

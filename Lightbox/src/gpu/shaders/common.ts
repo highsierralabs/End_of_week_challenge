@@ -267,7 +267,7 @@ bool lensWithin(vec3 p, int skip, vec4 P) {
     else {
       float c1 = 0.5 * P.y - P.z;
       float q = dot(p.xz, p.xz) + (p.y - c1) * (p.y - c1) - P.z * P.z;
-      if (P.z > 0.0 ? q > 0.0 : (q < 0.0 || p.y > c1)) return false;
+      if (P.z > 0.0 ? (q > 0.0 && p.y > c1) : (q < 0.0 || p.y > c1)) return false;
     }
   }
   if (skip != 2) {
@@ -275,7 +275,7 @@ bool lensWithin(vec3 p, int skip, vec4 P) {
     else {
       float c2 = -0.5 * P.y + P.w;
       float q = dot(p.xz, p.xz) + (p.y - c2) * (p.y - c2) - P.w * P.w;
-      if (P.w > 0.0 ? q > 0.0 : (q < 0.0 || p.y < c2)) return false;
+      if (P.w > 0.0 ? (q > 0.0 && p.y < c2) : (q < 0.0 || p.y < c2)) return false;
     }
   }
   return true;
@@ -481,10 +481,22 @@ float fresnelConductor(float cosi, float n, float k) {
 }
 
 // ---------------------------------------------------------------- microfacets (GGX)
-float ggxD(float nh, float a) {
+// GGX distribution from the squared sine of the angle between normal and half-vector (taken
+// from their cross product), so that a nearly polished surface does not lose 1 - cos^2 to
+// rounding.
+float ggxD(float sin2, float a) {
   float a2 = a * a;
-  float q = nh * nh * (a2 - 1.0) + 1.0;
+  float q = a2 * (1.0 - sin2) + sin2;
   return a2 / (PI * q * q);
+}
+float sin2Of(vec3 n, vec3 h) {
+  vec3 c = cross(n, h);
+  return min(1.0, dot(c, c));
+}
+// True for infinities and NaNs, tested on the bits because optimising compilers fold the
+// usual comparisons away.
+bool notFinite(float x) {
+  return (floatBitsToUint(x) & 0x7F800000u) == 0x7F800000u;
 }
 float ggxLambda(float c, float a) {
   float c2 = c * c;
@@ -537,9 +549,8 @@ void evalBsdf(int mtype, vec4 m0, vec3 n, vec3 wo, vec3 wi, out float fcos, out 
     float a = m0.w * m0.w;
     if (a > 0.0) {
       vec3 h = normalize(wi + wo);
-      float nh = dot(n, h);
       float oh = dot(wo, h);
-      float D = ggxD(nh, a);
+      float D = ggxD(sin2Of(n, h), a);
       float F = fresnelCoat(oh, COAT_IOR);
       fcos += F * D * ggxG2(ci, co, a) / (4.0 * co);
       pdf += Fo * ggxG1(co, a) * D / (4.0 * co);
@@ -548,9 +559,8 @@ void evalBsdf(int mtype, vec4 m0, vec3 n, vec3 wo, vec3 wi, out float fcos, out 
     float a = m0.w * m0.w;
     if (a <= 0.0) return;
     vec3 h = normalize(wi + wo);
-    float nh = dot(n, h);
     float oh = dot(wo, h);
-    float D = ggxD(nh, a);
+    float D = ggxD(sin2Of(n, h), a);
     float F = fresnelConductor(oh, spec(int(m0.y)), spec(int(m0.z)));
     fcos = F * D * ggxG2(ci, co, a) / (4.0 * co);
     pdf = ggxG1(co, a) * D / (4.0 * co);

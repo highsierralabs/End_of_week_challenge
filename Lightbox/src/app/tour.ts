@@ -1,7 +1,7 @@
 // The tour: twelve live scenes, each showing one thing light does, with a suggestion for what
 // to change. Any step can be taken into the studio.
 import type { Scene } from '../core/scene';
-import { cornellBox, gasTubes, gems, lensBench, newtonPrism, stillLife } from '../core/scenes';
+import { cornellBox, gasTubes, gems, newtonPrism, rayBox, stillLife } from '../core/scenes';
 import { ballLens, causticScene, depthScene, fresnelScene, sodiumScene, softShadows } from '../core/tourscenes';
 import { button, clear, h } from './controls';
 import type { Store } from './store';
@@ -30,7 +30,7 @@ const STEPS: Step[] = [
   {
     title: 'Walls are lamps too',
     text: [
-      'Every lit surface sends light on. The white block is red on the side facing the red wall and green on the side facing the green one: light that left the lamp, struck paint, and carried the paint’s colour with it.',
+      'Every lit surface sends light on. The white block takes a red cast on the side facing the red wall, and the floor, the ceiling and the back wall glow red and green toward their edges: light that left the lamp, struck paint, and carried the paint\u2019s colour with it.',
       'This second-hand light is most of what you see in a room. Take it away and shadows turn black.',
     ],
     tryIt: 'In the studio, set Bounces to 2 under Room and watch the box go dark.',
@@ -69,7 +69,7 @@ const STEPS: Step[] = [
       'Glass slows blue light more than red, so it bends blue more. A prism turns that small difference into a spread of colour. This is Newton’s experiment: a slit of white light, a prism, a card.',
       'Nothing in the tracer knows about rainbows. It knows the glass’s measured index at each wavelength, traces one wavelength per ray, and the spectrum appears on the card.',
     ],
-    tryIt: 'In the studio, turn the prism a few degrees, or change its glass to crown glass: the spectrum narrows.',
+    tryIt: 'In the studio, select the prism and use Turn to rotate it a few degrees: the spectrum slides along the card and stretches.',
     scene: newtonPrism,
   },
   {
@@ -111,11 +111,11 @@ const STEPS: Step[] = [
   {
     title: 'No lens is perfect',
     text: [
-      'A lens brings parallel light to a focus. The table cuts through this beam, so the cone of light draws itself on the table top: converging to the focus and spreading again.',
-      'Look closely at the focus. Blue light, bent more, crosses the axis sooner than red. A single lens cannot focus all colours at once, which is why camera lenses are stacks of different glasses.',
+      'Seven thin beams of white light skim the table, so each draws its own path. A glass rod standing on end works as a lens: it bends the beams together, they cross just behind it and fan out again.',
+      'But they do not cross at one point. The outer beams are bent too much and cross sooner than the inner ones (spherical aberration), and each beam leaves the glass spread into colours, blue bent more than red (chromatic aberration). A camera lens is a stack of several glasses and curves chosen to cancel both.',
     ],
-    tryIt: 'In the studio, select the lens and change the curve of its faces: the focal length updates as you go.',
-    scene: lensBench,
+    tryIt: 'In the studio, drag the rod sideways across the beams, or change its glass to crown glass: the crossing point moves away.',
+    scene: rayBox,
   },
 ];
 

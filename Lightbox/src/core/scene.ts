@@ -23,7 +23,7 @@ export type Material =
   | { kind: 'plastic'; color: Rgb; rough: number }
   | { kind: 'metal'; metal: MetalName; rough: number }
   | { kind: 'mirror' }
-  | { kind: 'glass'; glass: GlassName; tint?: Rgb; density?: number; rough?: number }
+  | { kind: 'glass'; glass: GlassName; tint?: Rgb; density?: number }
   /** A diffuse emitter. `lumens` is its total luminous flux. */
   | { kind: 'light'; spectrum: LightSpectrum; lumens: number }
   /** An emitter that shines only within `spread` degrees of its surface normal: a spotlight, a
@@ -116,6 +116,8 @@ export interface Scene {
 }
 
 export const SENSOR_HEIGHT_MM = 24;
+/** Below this width / height the picture gains height instead of losing width. */
+export const MIN_ASPECT = 1.25;
 export const SENSOR_WIDTH_MM = 36;
 
 export const defaultCamera = (): Camera => ({
@@ -129,7 +131,7 @@ export function isEmitter(m: Material): m is Extract<Material, { kind: 'light' |
 
 /** True when a ray meeting this material is deflected in exactly one or two directions. */
 export function isDelta(m: Material): boolean {
-  return m.kind === 'mirror' || m.kind === 'grating' || (m.kind === 'glass' && !(m.rough && m.rough > 0)) || (m.kind === 'metal' && m.rough <= 0);
+  return m.kind === 'mirror' || m.kind === 'grating' || m.kind === 'glass' || (m.kind === 'metal' && m.rough < 0.02);
 }
 
 let idCounter = 0;

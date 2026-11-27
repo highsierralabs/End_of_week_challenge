@@ -61,8 +61,12 @@ function shape(v: unknown): Shape | null {
     case 'disc': return { kind: 'disc', r: size(s.r, 0.1) };
     case 'prism': return { kind: 'prism', sides: Math.round(num(s.sides, 3, 12, 3)), apex: num(s.apex, 10, 150, 60), size: size(s.size, 0.1), h: size(s.h, 0.1) };
     case 'gem': return { kind: 'gem', cut: oneOf(s.cut, ['brilliant', 'step', 'octahedron'] as const, 'brilliant'), r: size(s.r, 0.05) };
-    case 'lens': return { kind: 'lens', r: size(s.r, 0.08), t: size(s.t, 0.03), r1: num(s.r1, -50, 50, 0.2), r2: num(s.r2, -50, 50, 0.2) };
-    case 'mesh': return typeof s.mesh === 'string' && s.mesh.length < 64 ? { kind: 'mesh', mesh: s.mesh, size: size(s.size, 0.3) } : null;
+    case 'lens': {
+      // A face flatter than 1 mm of radius is not a lens; treat tiny radii as flat.
+      const radius = (v: unknown, fallback: number) => { const R = num(v, -50, 50, fallback); return Math.abs(R) < 1e-3 ? 0 : R; };
+      return { kind: 'lens', r: size(s.r, 0.08), t: size(s.t, 0.03), r1: radius(s.r1, 0.2), r2: radius(s.r2, 0.2) };
+    }
+    case 'mesh': return typeof s.mesh === 'string' && /^[a-z][a-z0-9]{0,31}$/.test(s.mesh) ? { kind: 'mesh', mesh: s.mesh, size: size(s.size, 0.3) } : null;
     default: return null;
   }
 }

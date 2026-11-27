@@ -146,7 +146,7 @@ try {
     check(tourOk && steps === 12, 'tour: all 12 steps load and render');
     await page.click('text=Open this scene in the studio');
     st = await state(page);
-    check(st.mode === 'studio' && st.scene === 'Lens bench', 'tour: the last step opens in the studio');
+    check(st.mode === 'studio' && st.scene === 'Ray box', 'tour: the last step opens in the studio');
 
     // The spectroscope.
     await page.click('[data-mode="spectro"]');

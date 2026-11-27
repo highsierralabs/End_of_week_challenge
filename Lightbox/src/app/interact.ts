@@ -14,6 +14,8 @@ export class Interaction {
   previewScale = 2;
   /** Set false to freeze the scene (tour and spectroscope still allow the camera). */
   editable = true;
+  /** Set true to ignore all input (while a picture is being exported). */
+  frozen = false;
   /** Set true to hold the camera still (the spectroscope's view is fixed). */
   cameraLocked = false;
   /** Extra drawing on the overlay, in CSS pixels (the spectroscope's wavelength scale). */
@@ -36,9 +38,9 @@ export class Interaction {
     canvas.addEventListener('pointermove', (e) => this.move(e));
     canvas.addEventListener('pointerup', (e) => this.up(e));
     canvas.addEventListener('pointercancel', (e) => this.up(e));
-    canvas.addEventListener('wheel', (e) => { e.preventDefault(); this.dolly(Math.exp(e.deltaY * 0.0012)); }, { passive: false });
+    canvas.addEventListener('wheel', (e) => { e.preventDefault(); if (!this.frozen) this.dolly(Math.exp(e.deltaY * 0.0012)); }, { passive: false });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-    canvas.addEventListener('dblclick', (e) => this.focusAt(e.offsetX, e.offsetY));
+    canvas.addEventListener('dblclick', (e) => { if (!this.frozen) this.focusAt(e.offsetX, e.offsetY); });
     store.on(() => this.drawOverlay());
   }
 
@@ -76,6 +78,7 @@ export class Interaction {
   }
 
   private down(e: PointerEvent): void {
+    if (this.frozen) return;
     this.canvas.setPointerCapture(e.pointerId);
     this.pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
     this.last = { x: e.offsetX, y: e.offsetY };
@@ -168,7 +171,9 @@ export class Interaction {
     const r = len(v);
     let az = Math.atan2(v[0], v[2]) - dx * 0.006;
     let el = Math.asin(Math.min(1, Math.max(-1, v[1] / r))) + dy * 0.006;
-    el = Math.min(1.5, Math.max(-0.2, el));
+    // Not past the zenith, and not below the table top.
+    const floor = Math.asin(Math.min(1, Math.max(-1, (0.02 - cam.target[1]) / r)));
+    el = Math.min(1.5, Math.max(floor, el));
     az = az % (2 * Math.PI);
     cam.pos = add(cam.target, [r * Math.cos(el) * Math.sin(az), r * Math.sin(el), r * Math.cos(el) * Math.cos(az)]);
     this.busy();
@@ -182,6 +187,8 @@ export class Interaction {
     const dist = len(sub(cam.pos, cam.target));
     const k = (2 * f.tanHalf * dist) / this.canvas.clientHeight;
     const shift = add(mul(f.right, -dx * k), mul(f.up, dy * k));
+    // The camera stays above the table.
+    if (cam.pos[1] + shift[1] < 0.02) shift[1] = 0.02 - cam.pos[1];
     cam.pos = add(cam.pos, shift);
     cam.target = add(cam.target, shift);
     this.busy();

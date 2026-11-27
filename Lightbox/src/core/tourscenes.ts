@@ -1,5 +1,5 @@
 // Scenes built for the tour and the spectroscope: each isolates one thing light does.
-import { type GasName, type Material, type Rgb, type Scene, defaultCamera, defaultDarkroom } from './scene';
+import { type Camera, type GasName, MIN_ASPECT, type Material, type Rgb, type Scene, defaultCamera, defaultDarkroom } from './scene';
 import { minimumDeviation, obj, onTable, prismDeviation } from './scenes';
 
 const matte = (color: Rgb): Material => ({ kind: 'diffuse', color });
@@ -77,7 +77,7 @@ export function sodiumScene(): Scene {
   s.objects = [
     ...room(),
     obj('Lamp', { kind: 'quad', half: [0.35, 0.25] }, { kind: 'light', spectrum: { kind: 'gas', gas: 'Na' }, lumens: 2500 }, [0, 1.2, 0.4], [180, 0, 0]),
-    ...paints.map((c, i) => onTable(`Paint ${i + 1}`, { kind: 'sphere', r: 0.085 }, { kind: 'plastic', color: c, rough: 0.15 }, -0.5 + i * 0.2, i % 2 ? 0.08 : -0.1)),
+    ...paints.map((c, i) => onTable(`Paint ${i + 1}`, { kind: 'sphere', r: 0.075 }, { kind: 'plastic', color: c, rough: 0.15 }, -0.375 + i * 0.15, i % 2 ? 0.1 : -0.1)),
   ];
   s.camera = { ...s.camera, pos: [0, 0.55, 1.4], target: [0, 0.07, 0], focus: 1.45, focal: 50, fstop: 0 };
   s.darkroom = { ...s.darkroom, wb: 5500 };
@@ -106,30 +106,49 @@ export const SPECTRO_TUBE = 1.2;
 export const SPECTRO_GRATING = 0.03;
 /** Half the tube's length. */
 export const SPECTRO_HALF = 0.1;
+/** Height of the prism's triangle. */
+export const SPECTRO_PRISM = 0.12;
 
 /** Angle (radians) at which a first-order line of the grating appears, from the grating normal. */
 export const gratingAngle = (nm: number): number => Math.asin(Math.min(1, (nm * GRATING_LINES) / 1e6));
 
+/**
+ * The spectroscope's camera for a picture of the given width / height: aimed at the middle of
+ * the visible spectrum's images, with a focal length that puts 395 to 715 nm across the width.
+ */
+export function spectroCamera(disperser: 'grating' | 'prism', aspect: number): Pick<Camera, 'pos' | 'target' | 'focal' | 'fstop' | 'focus'> {
+  // Half the picture's width, as a tangent, is (12 / focal) * max(aspect, MIN_ASPECT).
+  const width = 12 * Math.max(aspect, MIN_ASPECT);
+  if (disperser === 'grating') {
+    const a0 = gratingAngle(395);
+    const a1 = gratingAngle(715);
+    const mid = 0.5 * (a0 + a1);
+    return { pos: [0, 0.2, 0], target: [Math.sin(mid), 0.2, -Math.cos(mid)], focal: width / Math.tan(0.5 * (a1 - a0) * 1.06), fstop: 0, focus: 1.2 };
+  }
+  // The camera looks back along the ray that left the middle of the prism's second face.
+  const m = minimumDeviation(SPECTRO_PRISM);
+  const pos: [number, number, number] = [m.exit[0] + m.out[0] * 0.1, 0.2, m.exit[1] + m.out[1] * 0.1];
+  const d0 = prismDeviation(396);
+  const d1 = prismDeviation(710);
+  const mid = 0.5 * (d0 + d1);
+  return { pos, target: [pos[0] - Math.cos(mid), 0.2, pos[2] + Math.sin(mid)], focal: width / Math.tan(0.5 * (d0 - d1) * 1.1), fstop: 0, focus: 1.2 };
+}
+
 /** A gas tube seen through a grating or a prism placed just in front of the camera. */
-export function spectroscopeScene(gas: GasName, disperser: 'grating' | 'prism'): Scene {
+export function spectroscopeScene(gas: GasName, disperser: 'grating' | 'prism', aspect = 1.5): Scene {
   const s = base('Spectroscope');
   const tube = obj('Gas tube', { kind: 'cylinder', r: 0.0012, h: SPECTRO_HALF }, { kind: 'light', spectrum: { kind: 'gas', gas }, lumens: 60 }, [0, 0.2, -SPECTRO_TUBE]);
   s.objects = [tube];
   if (disperser === 'grating') {
-    const mid = gratingAngle(545);
     s.objects.push(obj('Grating', { kind: 'quad', half: [0.06, 0.06] }, { kind: 'grating', linesPerMm: GRATING_LINES }, [0, 0.2, -SPECTRO_GRATING], [90, 0, 0], true));
-    s.camera = { ...s.camera, pos: [0, 0.2, 0], target: [Math.sin(mid), 0.2, -Math.cos(mid)], focal: 62, fstop: 0, focus: 1.2 };
   } else {
     // The tube's light travels along +x into the middle of the prism's first face and leaves
-    // the middle of the second, turned by the deviation; the camera looks back along that ray.
-    const m = minimumDeviation(0.12);
+    // the middle of the second, turned by the deviation.
+    const m = minimumDeviation(SPECTRO_PRISM);
     tube.pos = [-SPECTRO_TUBE, 0.2, 0];
-    s.objects.push(obj('Prism', { kind: 'prism', sides: 3, apex: 60, size: 0.12, h: 0.12 }, { kind: 'glass', glass: 'sf11' }, [m.centre[0], 0.2, m.centre[1]], [90, m.turn, 0], true));
-    const pos: [number, number, number] = [m.exit[0] + m.out[0] * 0.1, 0.2, m.exit[1] + m.out[1] * 0.1];
-    // Aim between the directions of the violet and the red images, so the spectrum is centred.
-    const mid = 0.5 * (prismDeviation(410) + prismDeviation(700));
-    s.camera = { ...s.camera, pos, target: [pos[0] - Math.cos(mid), 0.2, pos[2] + Math.sin(mid)], focal: 105, fstop: 0, focus: 1.2 };
+    s.objects.push(obj('Prism', { kind: 'prism', sides: 3, apex: 60, size: SPECTRO_PRISM, h: 0.12 }, { kind: 'glass', glass: 'sf11' }, [m.centre[0], 0.2, m.centre[1]], [90, m.turn, 0], true));
   }
+  s.camera = { ...s.camera, ...spectroCamera(disperser, aspect) };
   s.darkroom = { ...s.darkroom, bloom: 0.3, wb: 6500, tone: 'film' };
   s.bounces = 8;
   return s;
