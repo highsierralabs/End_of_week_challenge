@@ -5,8 +5,10 @@
 // OUTPUT:  exit 0 when valid; exit 1 with one ASCII line per finding.
 // VERSION HISTORY:
 //   1.0  2026-11-26  Initial release.
+//   1.1  2026-11-26  CLI runs only when executed directly, so importing it has no side effects.
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 
 const SUBJECT = /^EOWC-(CHG|DOC|REL|FIX)-\d{8}-\d{3}: \S.*$/;
 
@@ -30,7 +32,9 @@ export function checkMessage(msg) {
   return findings;
 }
 
-const args = process.argv.slice(2);
+// CLI only when run directly (gate.mjs imports checkMessage).
+const direct = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+const args = direct ? process.argv.slice(2) : [];
 if (args[0] === '--range') {
   const log = execFileSync('git', ['log', '--format=%H%x00%B%x01', args[1] ?? 'HEAD'], { encoding: 'utf8' });
   let bad = 0;
