@@ -45,3 +45,4 @@
 | EOWC-CHG-20261127-010 | Drumhead Metal: free-edged Kirchhoff plates by a Legendre Ritz method, true Chladni figures, plate sound; validated against Porter (2017); sweep skips modes the driver cannot excite |
 | EOWC-REL-20261127-011 | Release Drumhead v1.0.0: manifest entry with card image, root README list, third-party notices |
 | EOWC-CHG-20261127-012 | Index page plays each build's lead README clip (manifest clip, clipAlt) with the card still for reduced motion; seven kickoff questions in README and index |
+| EOWC-FIX-20261127-013 | Drumhead index clip: a 16:9 crop of play.gif (card-clip.gif) so the header and spectrum labels are not cut off; contract says how to make one |

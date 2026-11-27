@@ -23,7 +23,7 @@
       "date": "2026-11-27",
       "image": "Drumhead/docs/screenshots/card.jpg",
       "imageAlt": "The two isospectral twin drums, struck, with vermilion and blue contours of their vibration",
-      "clip": "Drumhead/docs/screenshots/play.gif",
+      "clip": "Drumhead/docs/screenshots/card-clip.gif",
       "clipAlt": "A guitar-shaped drum struck four times: two-ink contours of the membrane ripple and fade",
       "tech": ["WebGL2", "AudioWorklet", "Finite elements", "TypeScript"],
       "tag": "drumhead-v1.0.0"

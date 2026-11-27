@@ -55,7 +55,7 @@ Either way the output must have an `index.html` and must work from a subfolder. 
 | `title`, `tagline`, `summary` | The text of its entry on the index page. |
 | `date` | The Friday the week ended, `YYYY-MM-DD`. Entries are numbered in date order and listed newest first. |
 | `image`, `imageAlt` | Optional picture for the entry: 16:9, about 1200 px wide, under 300 KB. |
-| `clip`, `clipAlt` | Optional animated GIF that plays on the index in place of the picture, normally the README's lead clip. Near 16:9 (it is cropped to fill), under about 4 MB. It needs `image`, which visitors who ask for reduced motion see instead. `clipAlt` defaults to `imageAlt`. |
+| `clip`, `clipAlt` | Optional animated GIF that plays on the index in place of the picture, normally the README's lead clip. It is shown at 16:9 and cropped to fill, so if the README clip is another shape, add a 16:9 crop of it as `card-clip.gif` that keeps the app's edges whole (ffmpeg `crop`, then a fresh `palettegen`/`paletteuse` with `dither=none`). Under about 4 MB. It needs `image`, which visitors who ask for reduced motion see instead. `clipAlt` defaults to `imageAlt`. |
 | `tech` | Optional short labels. |
 | `out` | Optional output folder inside `dir`. The default is `dist`. |
 | `tag` | Optional release tag, for reference. |
