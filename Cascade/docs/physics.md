@@ -88,17 +88,24 @@ decays at rest.
 
 ## 6 Thinning
 
-The "keep one secondary" branch below the threshold is chosen before the draw. It is taken only when even the
-softest secondary's new weight, `w * sum(E) / E_min`, stays within the limit. A lone secondary keeps its parent's
-weight. Before this fix (found by review on 2026-11-26), the branch was decided after the draw. Hard secondaries
+Below the threshold, all secondaries are handled by one of two rules, chosen before the draw:
+- **Keep one.** If even the softest secondary's new weight, `w * sum(E) / E_min`, stays within the limit, one
+  secondary is kept with probability `E_i / sum(E)`. This rule is unbiased and conserves energy in every event.
+- **Keep all.** Otherwise thinning stops for this step, and all secondaries keep the parent's weight. This is
+  CORSIKA's weight limitation. A lone secondary keeps its parent's
+weight. History (2026-11-26):
+- **Decided after the draw.** Originally the branch was decided after the draw, a bias an independent review found. Hard secondaries
 were then over-weighted and soft ones under-weighted, and ground photons came out about 20 % low in thinned EM
-showers. Charged particles and muons were not measurably affected. After the fix, a 1 TeV gamma shower thinned at
-1e-3 gives 347 +- 12 ground photons, against 357 +- 19 unthinned.
+showers. Charged particles and muons were not measurably affected. - **Per-particle fallback.** A first fix fell back to per-particle thinning instead of keeping all. That conserves
+  energy only on average, and with the large interactive weight limit single records carried several times E0
+  (Xmax outliers near 2900 g/cm^2 at 100 PeV).
+- **Result of the current rule.** A 1 TeV gamma shower thinned at 1e-3 gives 347 +- 12 ground photons, against
+  357 +- 19 unthinned.
 
 
 Hillas thinning at `E_thin = epsilon * E0`, with weight limits. The electromagnetic limit
-is 100 times `epsilon * E0 / GeV`, and hadrons and muons get a limit 100 times smaller so
-the muon component stays well sampled. The factor of 100 above CORSIKA's usual
+is 1000 times `epsilon * E0 / GeV`, and hadrons and muons get a limit 100 times smaller so
+the muon component stays well sampled. The factor of 1000 above CORSIKA's usual
 recommendation keeps an interactive particle budget: about 0.4 million particles and
 3-5 s for a 1 PeV shower on a desktop CPU. Every ground particle carries a weight, and
 the charts use weighted counts. Thinning trades fluctuations for speed: densities far
@@ -174,7 +181,8 @@ cores land on a point is `pi sr x integral J(E) pi r_k^2 dE`. Here J is the all-
 `E^2.6 J = 4000 GeV^1.6 m^-2 s^-1 sr^-1` below a knee at 4 PeV, a slope of -2.7 below the knee and -3.1 above it,
 and an extrapolation above 10^18 eV.
 
-The result is about 29 per year for k = 1 and about 1.5 per year for k = 3. The estimate is good to an order of
+Near the core, the density is fitted with a record-weighted power law over 0.3-30 m (v1.1), so that single heavy
+records cannot set the radius. The result is about 11 per year for k = 1 and about 1.4 per year for k = 3. The estimate is good to an order of
 magnitude:
 - the near-core bins are noisy because the showers are thinned;
 - proton showers only;

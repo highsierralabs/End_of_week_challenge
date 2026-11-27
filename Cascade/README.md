@@ -59,13 +59,16 @@ ensemble (24 showers each) is:
 
 | Primary at 1 PeV | Simulated Xmax | Expected (accelerator-tuned models) |
 |---|---|---|
-| Proton | 571 ± 12 g/cm² | 540-575 g/cm² |
-| Iron | 474 ± 5 g/cm² | 440-470 g/cm² |
+| Proton | 569 ± 12 g/cm² | 540-575 g/cm² |
+| Iron | 479 ± 6 g/cm² | 440-470 g/cm² |
 
 The ranges are approximate published full-simulation values. Photon showers reach 91-97% of Greisen's size at
 maximum, and the muon number grows as E^0.92, at the top of the 0.85-0.93 reference range. The model also misses in
-places: proton Xmax sits 13-35 g/cm² above the reference band at 3 of 5 energies, the iron elongation rate is about
-5 g/cm² per decade low, and the Xmax spread drifts away from the full simulations at the extremes. The
+places:
+- proton and iron Xmax sit inside the reference band at 3 of 5 energies each, and above it elsewhere (by up to
+  24 g/cm² for protons and 9 for iron);
+- the elongation rates are about 5-8 g/cm² per decade low;
+- the Xmax spread drifts away from the full simulations at some energies. The
 [validation page](validation.html) scores every one of these.
 
 ## Cascade and the RHACO observatory
@@ -87,11 +90,12 @@ make it a muon counter: the instrument defines the category. Cascade's rate mode
 Both comparisons point to a substantial non-muon component in the channel.
 
 A second estimate asks how often a shower core lands close enough to put several particles through a 1 cm² crystal
-at once. Folding simulated near-core densities from 10¹⁴ to 10¹⁸ eV with the cosmic-ray flux gives tens of times a
-year at most. The classifier's EAS categories fire about 2 times a day. Whatever those count-rate patterns are, they
+at once. Folding simulated near-core densities from 10¹⁴ to 10¹⁸ eV with the cosmic-ray flux gives about ten times
+a year. The classifier's EAS categories fire about 2 times a day. Whatever those count-rate patterns are, they
 are not mostly multi-particle shower cores, which is consistent with the observatory's own rule that the classifier
-labels categories, not physics. The Data panel works through the
-estimates, why they differ, and what measurement would settle it. The aggregate snapshot and its provenance are
+labels categories, not physics.
+
+The Data panel works through the estimates, why they differ, and what measurement would settle it. The aggregate snapshot and its provenance are
 described in [docs/rhaco_snapshot.md](docs/rhaco_snapshot.md), and the findings are collected for the observatory in
 [docs/rhaco_findings.md](docs/rhaco_findings.md).
 

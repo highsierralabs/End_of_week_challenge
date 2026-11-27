@@ -26,8 +26,8 @@
    "horizontalFlux1GeV": 0.02508466121587224,
    "verticalIntensity1GeV": 0.014712317100105815,
    "crystalBare": 0.06273376323775627,
-   "crystalShielded": 0.038579594096045985,
-   "crystalShieldedRelErr": 0.010852421928734104,
+   "crystalShielded": 0.03855950648875645,
+   "crystalShieldedRelErr": 0.010857129012345517,
    "muons": 29957
   },
   {
@@ -38,8 +38,8 @@
    "horizontalFlux1GeV": 0.024732693096427113,
    "verticalIntensity1GeV": 0.01451784169974726,
    "crystalBare": 0.061748269764813714,
-   "crystalShielded": 0.0379829104509266,
-   "crystalShieldedRelErr": 0.010954229114726611,
+   "crystalShielded": 0.0379723724647067,
+   "crystalShieldedRelErr": 0.01095671307198908,
    "muons": 29487
   },
   {
@@ -49,14 +49,14 @@
    "horizontalFlux": 0.03096786166090051,
    "horizontalFlux1GeV": 0.024368992706333813,
    "verticalIntensity1GeV": 0.014294655089848306,
-   "crystalBare": 0.06078928247557944,
-   "crystalShielded": 0.037398890352866934,
-   "crystalShieldedRelErr": 0.01104355701289205,
+   "crystalBare": 0.06078928247557945,
+   "crystalShielded": 0.03739756191700794,
+   "crystalShieldedRelErr": 0.011043905576908996,
    "muons": 29035
   }
  ],
- "barometricPctPerHPa": -0.15538241155497853,
- "barometricErr": 0.005882750476758421,
+ "barometricPctPerHPa": -0.1529561121868777,
+ "barometricErr": 0.005847109069432026,
  "primaryRatePerM2": 2559.7681414222684,
- "cpuMs": 346946
+ "cpuMs": 364770
 }

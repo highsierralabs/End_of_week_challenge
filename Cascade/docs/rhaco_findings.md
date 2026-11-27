@@ -52,15 +52,16 @@ For two or more particles from one shower to cross the crystal at once, the loca
 
 - simulated proton showers from 10^14 to 10^18 eV;
 - near-core densities measured against core distance;
+- fitted with a record-weighted power law over 0.3-30 m;
 - folded with the all-particle flux (normalisation good to about x2).
 
 | Local density | Showers per year at one point |
 |---|---|
-| >= 1 per cm^2 (two or so particles through the crystal) | about 29 (0.08 per day) |
-| >= 3 per cm^2 (about four particles) | about 1.5 |
+| >= 1 per cm^2 (two or so particles through the crystal) | about 11 (0.03 per day) |
+| >= 3 per cm^2 (about four particles) | about 1.4 |
 
 The classifier's EAS + SUPER-EAS categories fire **2.2 per live day** (measured). If those labels required several
-particles to cross the crystal at once, they would fire about 30 to 500 times more often than shower cores can supply.
+particles to cross the crystal at once, they would fire about 80 to 600 times more often than shower cores can supply.
 This holds for a bare crystal, and the lead only lowers the shower side.
 
 **Inference.** The EAS categories mark count-rate patterns produced by something other than multi-particle shower
@@ -71,8 +72,8 @@ cores. Candidates:
 - electronics.
 
 This is consistent with Measurement Philosophy principle 5, that measurement defines category. It adds a quantitative
-bound on genuine multi-particle core passages among the EAS-labelled events: at most a few percent at the
-1 per cm^2 level (about 4 %), and well under a percent at 3 per cm^2.
+bound on genuine multi-particle core passages among the EAS-labelled events: about 1 % at the
+1 per cm^2 level, and well under a percent at 3 per cm^2.
 
 ## 3 What a single shower delivers (simulated)
 
