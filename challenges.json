@@ -27,6 +27,20 @@
       "clipAlt": "A guitar-shaped drum struck four times: two-ink contours of the membrane ripple and fade",
       "tech": ["WebGL2", "AudioWorklet", "Finite elements", "TypeScript"],
       "tag": "drumhead-v1.0.0"
+    },
+    {
+      "slug": "lightbox",
+      "dir": "Lightbox",
+      "title": "Lightbox",
+      "tagline": "A spectral path tracer you can rearrange",
+      "summary": "Arrange glass, mirrors, cut gems and gas-discharge tubes, and watch a photograph of them form in your browser. Light is traced one wavelength at a time through measured glass and metal, so prisms make spectra and diamonds have fire without being told to. A twelve-step tour, a spectroscope with a quiz, a real camera and darkroom, and a validation page of 38 measurements against known answers come with it.",
+      "date": "2026-11-27",
+      "image": "Lightbox/docs/screenshots/card.jpg",
+      "imageAlt": "Seven thin beams of white light skim a table, cross behind a glass rod and fan out fringed with colour",
+      "clip": "Lightbox/docs/screenshots/studio.gif",
+      "clipAlt": "A still life of a glass ball, a wine glass and a gold knot settles from noise; the ball is dragged across the table and the camera orbits",
+      "tech": ["WebGL2", "Spectral path tracing", "Photon mapping", "TypeScript"],
+      "tag": "lightbox-v1.0.0"
     }
   ]
 }

@@ -8,6 +8,17 @@ further direction.
 
 ## The builds
 
+### 3. [Lightbox](Lightbox/): a spectral path tracer you can rearrange (27 November 2026)
+
+![The studio: a still life settles from noise, a glass ball is dragged across the table and its caustic follows, then the camera orbits](Lightbox/docs/screenshots/studio.gif)
+
+Arrange glass, mirrors, cut gems and gas-discharge tubes, and watch a photograph of them form. Light is traced one
+wavelength at a time through measured glass and metal, on WebGL2, with a photon pass for caustics. A twelve-step tour,
+a spectroscope with a quiz, a camera with lens rings and a darkroom come with it, and a validation page that checks
+the tracer against 38 known answers on your own GPU.
+
+**Live:** https://highsierralabs.github.io/End_of_week_challenge/lightbox/ · [Read more](Lightbox/README.md)
+
 ### 2. [Drumhead](Drumhead/): draw a drum, hear its shape (27 November 2026)
 
 ![A guitar-shaped drum struck four times: two-ink contours of the membrane ripple and fade](Drumhead/docs/screenshots/play.gif)
