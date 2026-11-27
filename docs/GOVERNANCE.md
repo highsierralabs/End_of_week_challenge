@@ -21,16 +21,20 @@ cards, librarians, CHG routing) is not used.
 5. **No automated commits.** No script, hook or scheduled task stages files or creates
    commits. Hooks validate only.
 6. **Tags.** Annotated tags only, forward-only, pushed with `--follow-tags`
-   (`cascade-vX.Y.Z` for releases).
+   (`<slug>-vX.Y.Z` for releases, for example `cascade-v1.0.0`).
 7. **History immutability.** Never amend, rebase or force-push a pushed commit; correct
    forward with a new commit or `git revert`. Local amend of an unpushed commit is
    allowed.
-8. **Gate before push.** `node tools/gate.mjs` gives one verdict over: the project check
-   (typecheck, lint, unit tests), the production build, a smoke test of the built site in GPU
-   Chromium on both backends, the commit-message audit, a
+8. **Gate before push.** `node tools/gate.mjs` gives one verdict over: for every challenge in
+   `challenges.json`, its check (typecheck, lint, unit tests), its production build and its
+   smoke test of the built site in GPU Chromium; the assembled Pages site
+   (`tools/build-site.mjs`); the commit-message audit; a
    public-safety scan (no user-home paths, host names, device serials, MAC addresses or
    credentials in tracked files), and a clean working tree.
 9. **Gate-then-amend (SOP Amendment A1).** The last commit before a push is gated over
    the committed tree, then amended (body only, while still unpushed) to carry the gate's
    own tuple line verbatim, then pushed.
 10. **Ledger.** Every change id is listed in `docs/changes/LEDGER.md` with its summary.
+11. **Challenges.** Each challenge is one top-level folder and one entry in `challenges.json`,
+    under the contract in [CHALLENGES.md](CHALLENGES.md). A challenge does not change another
+    challenge's folder. A push to `main` rebuilds and redeploys every listed challenge.
