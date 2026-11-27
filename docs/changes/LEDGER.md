@@ -46,3 +46,4 @@
 | EOWC-REL-20261127-011 | Release Drumhead v1.0.0: manifest entry with card image, root README list, third-party notices |
 | EOWC-CHG-20261127-012 | Index page plays each build's lead README clip (manifest clip, clipAlt) with the card still for reduced motion; seven kickoff questions in README and index |
 | EOWC-FIX-20261127-013 | Drumhead index clip: a 16:9 crop of play.gif (card-clip.gif) so the header and spectrum labels are not cut off; contract says how to make one |
+| EOWC-CHG-20261127-014 | Lightbox scaffold and engine: fetched optical reference data (CIE observer, NIST lines, Sellmeier glasses, metal indices), spectral core, scene model, exact shapes, WebGL2 path tracer and light tracer with tiled accumulation; unit tests |

@@ -1,0 +1,27 @@
+{
+ "_about": "Published CIE 1931 2-degree (x, y) chromaticity coordinates, for cross-checking only. Copied from the colour-science project file colour/colorimetry/datasets/illuminants/chromaticity_coordinates.py (BSD-3-Clause), which cites CIE 015:2004 and the Wikipedia table \"White points of standard illuminants\". The CIE publication itself was not fetched.",
+ "retrieved": "2026-11-27",
+ "A": {
+  "x": 0.44758,
+  "y": 0.40745,
+  "note": "CIE standard illuminant A. The fetched file does not state its temperature; 2856 K is the commonly quoted figure and is not sourced here."
+ },
+ "D65": {
+  "x": 0.3127,
+  "y": 0.329,
+  "xy_CIE_015_2004_5dp": {
+   "x": 0.31272,
+   "y": 0.32903
+  },
+  "note": "x, y are the 4-decimal rounding the file uses (as in RGB colourspace literature); the 5-decimal pair is what the file says CIE 015:2004 specifies."
+ },
+ "D50": {
+  "x": 0.3457,
+  "y": 0.3585,
+  "xy_CIE_015_2004_5dp": {
+   "x": 0.34567,
+   "y": 0.35851
+  },
+  "note": "Same remark as D65."
+ }
+}

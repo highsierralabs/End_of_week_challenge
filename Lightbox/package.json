@@ -1,0 +1,32 @@
+{
+  "name": "lightbox",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lightbox: a spectral path tracer in the browser. Arrange glass, mirrors, gems and gas-discharge tubes, and watch light do what light does.",
+  "license": "MIT",
+  "homepage": "https://highsierralabs.github.io/End_of_week_challenge/lightbox/",
+  "type": "module",
+  "engines": {
+    "node": ">=24.14.1 <25"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "smoke": "node scripts/smoke.mjs",
+    "data": "node scripts/build-data.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "eslint": "10.14.0",
+    "playwright": "1.64.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1",
+    "vite": "8.3.5",
+    "vitest": "5.1.0"
+  }
+}
