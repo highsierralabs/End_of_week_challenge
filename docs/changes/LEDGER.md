@@ -56,3 +56,4 @@
 | EOWC-DOC-20261127-021 | Lightbox README, physics note, screenshots, clips and the recorder (clips cut between marker flashes); smaller lamp in the inside-glass check so its closed-form comparison holds to 0.4 percent |
 | EOWC-REL-20261127-022 | Release Lightbox v1.0.0: manifest entry with card image and lead clip, root README list |
 | EOWC-CHG-20261127-023 | The /end-of-week-challenge skill ships in the repository as a project skill (.claude/skills), with machine specifics moved to optional local notes; README leads with the skill and a run-your-own guide; site links to the repository it is built from and takes its header name from the manifest owner |
+| EOWC-DOC-20261127-024 | Lightbox README: build cost section (elapsed time, model, tokens per agent, metered cost) and scripts/build-cost.mjs, which sums it from a Claude Code session's transcripts and usage log |

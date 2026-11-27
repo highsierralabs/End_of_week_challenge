@@ -189,3 +189,47 @@ tests/unit/      vitest
 The code is MIT. The reference data it ships are not: the CIE tables are CC BY-SA 4.0, the atomic line data are from
 the NIST Atomic Spectra Database, and the glass and metal data are from the refractiveindex.info database (CC0). See
 [THIRD-PARTY-NOTICES.md](../THIRD-PARTY-NOTICES.md) and [data-src/SOURCES.md](data-src/SOURCES.md).
+
+## Build cost
+
+What the build took, from Claude Code's own records of the session: its usage meter, and the transcripts of the main
+session and its five subagents, summed by `scripts/build-cost.mjs`. The run started on 27 November 2026 at 11:27
+Pacific and ended at 14:44 with the release pushed and the live site checked. The figures stop there; they leave out
+later conversation, including the request to add this section.
+
+| | |
+|---|---|
+| Elapsed, wall clock | 3 h 17 min |
+| Model time, summed over all agents (some ran in parallel) | 3 h 01 min |
+| Model | Claude Fable 5.2 (`claude-fable-5-2`), for the main session and every subagent |
+| API responses | 372 |
+| Output tokens | 1,108,191 |
+| Input tokens: uncached / written to cache / read from cache | 750 / 2,263,549 / 140,110,626 |
+| Cost at API prices, as metered by Claude Code | $100.07 |
+| The account's weekly meter (all models) during the run | from 1% to 10% |
+
+| Agent | API responses | Output | Cache writes | Cache reads | First to last response |
+|---|---:|---:|---:|---:|---:|
+| Main session (design, tracer, app, fixes, release) | 215 | 622,350 | 841,387 | 114,900,415 | 197 min |
+| Subagent: fetch optical reference data (two runs) | 35 | 64,206 | 314,187 | 3,652,748 | 20 min |
+| Subagent: mesh loaders and BVH | 13 | 101,681 | 263,204 | 1,438,003 | 16 min |
+| Subagent: Blender models | 22 | 92,146 | 204,098 | 2,736,014 | 23 min |
+| Subagent: independent code review | 22 | 115,947 | 337,153 | 4,926,321 | 27 min |
+| Subagent: visitor QA in the browser | 65 | 111,861 | 303,520 | 12,457,125 | 37 min |
+
+How to read these:
+
+- **The dollar figure is an estimate, not a bill.** The run was on a subscription. $100.07 is what Claude Code's meter
+  says the same calls would cost at API prices. The meter does include the subagents: its log kept rising during a
+  22-minute stretch in which only they were working.
+- **Almost all input is cache reads.** Every API call re-reads the conversation so far, and the main session's
+  context grew to about 840,000 tokens, so 215 calls read 115 million tokens from cache while writing under a million
+  new ones.
+- **The weekly meter is the account's, not this session's.** Other sessions were active on the same account that
+  afternoon, so the nine points are an upper bound on this build's share.
+- **Not counted:** the build machine's own work (rendering on the GPU, the test and smoke runs, Blender), and the
+  GitHub Actions run that deployed the site. Neither was measured.
+
+The same three hours by commit time: core and both tracers at 12:11, meshes, models and the app at 12:40, the
+validation page at 12:49, the smoke test at 13:05, the photon map at 13:16, the review and QA fixes at 14:16, the
+README and pictures at 14:33, the release at 14:40.
