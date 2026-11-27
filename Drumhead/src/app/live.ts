@@ -2,7 +2,7 @@
 // the vibration, and its Chladni response to a steady drive.
 
 import { buildRaster, cellAt, sampleCell, type Raster } from '../render/raster';
-import { type DrumData } from './worker';
+import type { DrumData } from './worker';
 
 export interface Tuning {
   /** Membrane wave speed sqrt(tension / surface density), m/s. Sets the pitch. */

@@ -52,6 +52,10 @@ class ModalProcessor extends AudioWorkletProcessor {
   }
 
   private onMsg(m: Msg) {
+    // Never let a non-finite number into the resonators or the drive: it would stick forever.
+    const finite = (a?: Float32Array) => !a || a.every(Number.isFinite);
+    if (!finite(m.freqs) || !finite(m.decays) || !finite(m.amps)) return;
+    for (const k of ['click', 'cutoff', 'pan', 'freq', 'gain'] as const) if (m[k] !== undefined && !Number.isFinite(m[k])) return;
     if (m.type === 'bank' && m.freqs && m.decays && m.id !== undefined) {
       const n = m.freqs.length;
       const b: Bank = { n, cr: new Float32Array(n), ci: new Float32Array(n), zr: new Float32Array(n), zi: new Float32Array(n), pan: m.pan ?? 0 };
@@ -80,6 +84,7 @@ class ModalProcessor extends AudioWorkletProcessor {
     } else if (m.type === 'stop') {
       for (const b of this.banks.values()) { b.zr.fill(0); b.zi.fill(0); }
       this.dTarget = 0;
+      if (!Number.isFinite(this.dGain)) this.dGain = 0;
     }
   }
 

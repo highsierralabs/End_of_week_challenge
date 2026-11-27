@@ -4,7 +4,7 @@
 
 import { PRESETS } from '../solver/shapes';
 import { LiveDrum, type Tuning } from './live';
-import { type DrumData } from './worker';
+import type { DrumData } from './worker';
 
 export interface QuizHost {
   getDrum: (id: string) => Promise<DrumData>;
@@ -29,6 +29,7 @@ export class Quiz {
   private score = 0;
   private rounds = 0;
   private seed = (Date.now() % 100000) + 1;
+  private token = 0;
 
   constructor(parent: HTMLElement, host: QuizHost) {
     this.host = host;
@@ -64,7 +65,9 @@ export class Quiz {
   close(): void { this.el.hidden = true; }
 
   async round(): Promise<void> {
+    const token = ++this.token;
     this.done = false;
+    this.live = null;
     // One round in three is a twins round.
     const twins = this.rand(3) === 0;
     let opts: string[];
@@ -90,6 +93,8 @@ export class Quiz {
     this.el.querySelector<HTMLButtonElement>('[data-q="next"]')!.hidden = true;
     this.updateScore();
     const data = await this.host.getDrum(this.answer);
+    // A later round started while this drum was solving: it owns the stage now.
+    if (token !== this.token) return;
     this.live = new LiveDrum(data, this.host.tuning());
     this.host.sendBank(BANK, this.live);
     // Strike a little off-centre, the same way for every drum.

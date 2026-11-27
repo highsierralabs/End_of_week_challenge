@@ -16,7 +16,7 @@ import { DEFAULT_TUNING, LiveDrum, type Tuning } from './live';
 import { formatNote } from './notes';
 import { Quiz } from './quiz';
 import { decodeOutline, encodeOutline } from './share';
-import { type DrumData, type SolveJob, type SolveReply, type SolveRequest } from './worker';
+import type { DrumData, SolveJob, SolveReply, SolveRequest } from './worker';
 
 type Mode = 'play' | 'draw' | 'sand' | 'listen';
 
@@ -244,7 +244,8 @@ async function load(what: string | Poly): Promise<void> {
     updateCard();
     layout();
     if (mode === 'sand') enterSand();
-    if (mode === 'draw') setMode('play');
+    // Back to play after a drawing becomes a drum, but never under a stroke still being drawn.
+    if (mode === 'draw' && typeof what !== 'string' && !stroke) setMode('play');
     if (galleryDlg.open) fillGallery();
     busyEl.classList.remove('is-on');
     (window as unknown as { drumhead: Record<string, unknown> }).drumhead.ready = true;
@@ -252,6 +253,8 @@ async function load(what: string | Poly): Promise<void> {
     if (token !== loadToken) return;
     busyEl.textContent = e instanceof Error ? e.message : String(e);
     busyEl.classList.add('is-error');
+    // Never leave the page without a drum.
+    if (!slots.length && what !== 'circle') setTimeout(() => void load('circle'), 1500);
     setTimeout(() => { if (token === loadToken) busyEl.classList.remove('is-error', 'is-on'); }, 3500);
   }
 }
@@ -468,7 +471,10 @@ function sandLevel(s: Slot): number {
   if (!phi) return 0;
   let peak = 0;
   for (let k = 0; k < phi.length; k++) peak = Math.max(peak, response(s, phi, s.live.freqs[k]!));
-  return Math.min(1, Math.sqrt(response(s, phi, driveF) / peak) * 1.6);
+  // On the rim every mode is still: nothing to drive.
+  if (!(peak > 0)) return 0;
+  const v = Math.min(1, Math.sqrt(response(s, phi, driveF) / peak) * 1.6);
+  return Number.isFinite(v) ? v : 0;
 }
 
 // ---------------------------------------------------------------- input
@@ -516,7 +522,7 @@ stageEl.addEventListener('pointerdown', (e) => {
     stageEl.setPointerCapture(e.pointerId);
     strokeView = drawView;
     const [x, y] = screenToWorld(drawView, sx, sy);
-    stroke = [x, y];
+    stroke = [Math.max(-0.5, Math.min(0.5, x)), Math.max(-0.5, Math.min(0.5, y))];
     return;
   }
   if (mode === 'listen') return;
@@ -642,9 +648,15 @@ function syncSliders(): void {
 popEl.addEventListener('input', (e) => {
   const el = e.target as HTMLInputElement;
   const k = el.dataset.in as SliderKey;
+  const oldSpeed = tuning.speed;
   tuning = { ...tuning, [k]: fromPos(k, Number(el.value)) };
   slots.forEach((s, i) => { s.live.retune(tuning); sendBank(s, i); s.ampDirty = true; });
-  if (k === 'speed' && slots[0]) { driveF = driveF * 1; updateResponse(); updateCard(); }
+  if (k === 'speed' && slots[0]) {
+    // Every frequency scales with the wave speed; keep the drive where it was relative to the modes.
+    driveF *= tuning.speed / oldSpeed;
+    responseCurve = undefined;
+    updateCard();
+  }
   syncSliders();
 });
 
@@ -705,6 +717,7 @@ function fillGallery(): void {
 // ---------------------------------------------------------------- frame loop
 
 let lastT = performance.now();
+let prevLo = 0;
 function frame(now: number): void {
   const dt = Math.min(0.05, (now - lastT) / 1000);
   lastT = now;
@@ -759,7 +772,8 @@ function frame(now: number): void {
     const lo = f0[0]! / 1.35, hi = f0[f0.length - 1]! * 1.08;
     const firstStrip = !strip.state;
     strip.state = { rows, lo, hi, cursor: mode === 'sand' ? driveF : undefined, response: mode === 'sand' ? responseCurve : undefined, highlight: highlight >= 0 ? highlight : undefined };
-    if (firstStrip || (mode === 'sand' && !responseCurve)) updateResponse();
+    if (firstStrip || (mode === 'sand' && !responseCurve) || strip.state.lo !== prevLo) updateResponse();
+    prevLo = lo;
   }
   strip.draw();
   requestAnimationFrame(frame);
@@ -796,7 +810,7 @@ async function renderOffline(seconds = 2, slot = 0): Promise<{ peak: number; rms
   setMode,
   strike: (i: number, x: number, y: number) => strike(i, x, y, 0.85),
   state: () => ({
-    mode, current, driveF, drums: slots.map((s) => ({ name: s.name, nv: s.live.data.nv, modes: s.live.data.count, f1: s.live.fundamental, ms: s.live.data.ms, area: s.live.data.area, heard: s.live.data.heard, lambda: Array.from(s.live.data.lambda) })),
+    mode, current, driveF, levels: slots.map((s) => s.level), drives: slots.map((s) => s.drive), drums: slots.map((s) => ({ name: s.name, nv: s.live.data.nv, modes: s.live.data.count, f1: s.live.fundamental, ms: s.live.data.ms, area: s.live.data.area, heard: s.live.data.heard, lambda: Array.from(s.live.data.lambda) })),
   }),
   setDrive: (f: number) => { driveF = f; for (const s of slots) s.ampDirty = true; },
   quiz: () => quiz.state,

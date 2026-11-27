@@ -57,6 +57,14 @@ describe('membrane eigenvalues', () => {
     j.forEach((z, i) => expect(rel(d.lambda[i]!, z * z)).toBeLessThan(0.01));
   });
 
+  it('finds every copy of a repeated eigenvalue, even on a tiny mesh', () => {
+    // 3 x 3 interior vertices: 9 unknowns, with the square's (m,n)/(n,m) pairs exactly degenerate.
+    const mesh = refineTriangles([[0, 0, 1, 0, 1, 1], [0, 0, 1, 1, 0, 1]], 2, [0, 0, 1, 0, 1, 1, 0, 1]);
+    const d = solveDrum(mesh, 10);
+    expect(d.count).toBe(9);
+    expect(rel(d.lambda[1]!, d.lambda[2]!)).toBeLessThan(1e-9);
+  });
+
   it('modes are mass-orthonormal', () => {
     const mesh = refineTriangles([[0, 0, 1, 0, 1, 1], [0, 0, 1, 1, 0, 1]], 4, [0, 0, 1, 0, 1, 1, 0, 1]);
     const sys = assemble(mesh);

@@ -42,6 +42,8 @@ try {
     page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
     await page.goto(base);
     await page.waitForFunction(() => window.drumhead?.ready, null, { timeout: 60000 });
+    // Worker code must stay in the workers: a handler on the page would answer its own messages.
+    check(await page.evaluate(() => window.onmessage === null), 'page: no worker message handler on the main thread');
     const st = await page.evaluate(() => window.drumhead.state());
     const d = st.drums[0];
     const exact = (100 * 2.404825557695773) / 0.33 / (2 * Math.PI);
@@ -84,11 +86,21 @@ try {
     check(drawn.modes >= 64 && drawn.f1 > 20, `draw: freehand drum, ${drawn.nv} vertices, fundamental ${drawn.f1.toFixed(1)} Hz`);
     await page.mouse.click(cx + 20, cy + 10);
 
+    // Sand: a tap in a corner (every mode still there) must not poison the drive.
+    await page.click('[data-shape="square"]');
+    await page.waitForFunction(() => window.drumhead.state().current === 'square', null, { timeout: 60000 });
     // Sand.
     await page.click('[data-mode="sand"]');
+    {
+      const b2 = await page.locator('.dh-stage').boundingBox();
+      const corner = await page.evaluate(() => { const r = document.querySelector('.dh-stage').getBoundingClientRect(); return [r.width, r.height]; });
+      // The square spans +-0.28 m on a 1 m table centred in the stage: aim just inside its lower-right corner.
+      const side = Math.min(corner[0], corner[1]) * 0.96;
+      await page.mouse.click(b2.x + corner[0] / 2 + side * 0.278, b2.y + corner[1] / 2 + side * 0.278);
+    }
     await page.waitForTimeout(1500);
-    const mode = await page.evaluate(() => window.drumhead.state().mode);
-    check(mode === 'sand', 'sand: mode entered and ran 1.5 s');
+    const sand = await page.evaluate(() => window.drumhead.state());
+    check(sand.mode === 'sand' && sand.levels.every(Number.isFinite), `sand: ran 1.5 s after a corner tap at (${sand.drives[0].map((v) => v.toFixed(3))}), drive level ${sand.levels[0]}`);
 
     // Listen.
     await page.click('[data-mode="listen"]');

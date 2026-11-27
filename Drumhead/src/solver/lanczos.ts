@@ -78,6 +78,26 @@ function startVector(n: number): Float64Array {
   return v;
 }
 
+/** A deterministic vector orthogonal to the first `count` basis vectors, or null if none is left. */
+function restartVector(n: number, count: number, V: Float64Array): Float64Array | null {
+  let s = (0x2545f491 + count * 7919) >>> 0;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const v = new Float64Array(n);
+    for (let i = 0; i < n; i++) { s = (s * 1664525 + 1013904223) >>> 0; v[i] = s / 4294967296 - 0.5; }
+    for (let pass = 0; pass < 2; pass++) {
+      for (let q = 0; q < count; q++) {
+        let dot = 0;
+        const o = q * n;
+        for (let i = 0; i < n; i++) dot += V[o + i]! * v[i]!;
+        for (let i = 0; i < n; i++) v[i] = v[i]! - dot * V[o + i]!;
+      }
+    }
+    const nrm = Math.sqrt(v.reduce((a, x) => a + x * x, 0));
+    if (nrm > 1e-8) { for (let i = 0; i < n; i++) v[i] = v[i]! / nrm; return v; }
+  }
+  return null;
+}
+
 export function lowestModes(sys: System, want: number, onProgress?: (f: number) => void): Modes {
   const n = sys.n;
   const k = Math.min(want, n);
@@ -117,9 +137,17 @@ export function lowestModes(sys: System, want: number, onProgress?: (f: number) 
       nrm = Math.sqrt(w.reduce((a, x) => a + x * x, 0));
       beta[j] = nrm;
       if (j + 1 < m) {
-        if (nrm < 1e-14 * Math.abs(alpha[j]!)) { steps = j + 1; break; }
-        v = new Float64Array(n);
-        for (let i = 0; i < n; i++) v[i] = w[i]! / nrm;
+        if (nrm < 1e-12 * Math.abs(alpha[j]!)) {
+          // Invariant subspace found. Restart with a fresh vector orthogonal to the basis so far;
+          // T becomes block diagonal (beta = 0), and repeated eigenvalues get their other copies.
+          beta[j] = 0;
+          const r = restartVector(n, j + 1, V);
+          if (!r) { steps = j + 1; break; }
+          v = r;
+        } else {
+          v = new Float64Array(n);
+          for (let i = 0; i < n; i++) v[i] = w[i]! / nrm;
+        }
       }
       if (onProgress && (j & 7) === 0) onProgress(j / m);
     }

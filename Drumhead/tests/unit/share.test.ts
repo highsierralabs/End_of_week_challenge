@@ -19,5 +19,7 @@ describe('share links', () => {
   it('rejects junk', () => {
     expect(decodeOutline('not base64!')).toBeNull();
     expect(decodeOutline('AAAA')).toBeNull();
+    // Eight points at the origin: valid encoding, no area.
+    expect(decodeOutline('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')).toBeNull();
   });
 });

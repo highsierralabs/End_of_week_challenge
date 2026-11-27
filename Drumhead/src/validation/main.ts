@@ -2,7 +2,7 @@
 
 import './validation.css';
 import { DRISCOLL_GWW } from '../solver/reference';
-import { type VMsg } from './worker';
+import type { VMsg } from './worker';
 
 const RED = '#bd3b26';
 const BLUE = '#2f5fa8';

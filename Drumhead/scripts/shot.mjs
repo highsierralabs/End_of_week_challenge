@@ -15,7 +15,9 @@ const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') errors.push(`${m.type()}: ${m.text()}`); });
 await page.goto(url);
-if (!url.includes("validation")) await page.waitForFunction(() => window.drumhead?.ready, null, { timeout: 60000 });
+// The app pages expose window.drumhead; the validation page and the site index do not.
+const isApp = !url.includes('validation') && !/End_of_week_challenge\/(\?|$)/.test(url);
+if (isApp) await page.waitForFunction(() => window.drumhead?.ready, null, { timeout: 60000 });
 const ev = arg('eval');
 if (ev) console.log('eval:', JSON.stringify(await page.evaluate(`(async () => { ${ev} })()`)));
 await page.waitForTimeout(Number(arg('wait', 400)));

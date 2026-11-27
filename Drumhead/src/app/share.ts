@@ -30,7 +30,11 @@ export function decodeOutline(code: string): number[] | null {
       if (!(Math.abs(v) <= 0.5)) return null;
       out.push(v);
     }
-    return out;
+    // A drum needs some area: reject outlines that collapse to a point or a line.
+    let a = 0;
+    const n = out.length / 2;
+    for (let i = 0; i < n; i++) { const j = (i + 1) % n; a += out[2 * i]! * out[2 * j + 1]! - out[2 * j]! * out[2 * i + 1]!; }
+    return Math.abs(a / 2) >= 0.004 ? out : null;
   } catch {
     return null;
   }
