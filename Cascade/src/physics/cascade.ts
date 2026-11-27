@@ -50,7 +50,8 @@ export const DEFAULT_PARAMS: ShowerParams = {
 };
 
 const PROFILE_STEP = 10;
-export const WEIGHT_FACTOR = 100;
+/** Weight limit = epsilon * E0/GeV * factor (CORSIKA's recommendation is factor 1). Tunable for tests. */
+export const TUNE_WEIGHT = { factor: 1000 };
 /** Proper time is stored in ns. */
 const TAU_PI_NS = CTAU_PI / C_M_PER_NS;
 const TAU_MU_NS = CTAU_MU / C_M_PER_NS;
@@ -264,8 +265,9 @@ class Cascade {
     this.hadCut = params.hadronCutGeV;
     this.eThin = params.thinning > 0 ? params.thinning * this.E0 : 0;
     // Weight limit: CORSIKA's epsilon*E0/GeV leaves ~300/epsilon particles near the
-    // ground; a factor WEIGHT_FACTOR above it keeps an interactive particle budget.
-    this.wMaxEm = params.thinning > 0 ? Math.max(1, params.thinning * this.E0 * WEIGHT_FACTOR) : 1;
+    // ground; a factor TUNE_WEIGHT.factor above it keeps an interactive particle budget.
+    // Safe because the below-threshold keep-one rule conserves energy in every event.
+    this.wMaxEm = params.thinning > 0 ? Math.max(1, params.thinning * this.E0 * TUNE_WEIGHT.factor) : 1;
     this.wMaxHad = Math.max(1, this.wMaxEm / 100);
     this.importantE = Math.max(1, 1e-4 * this.E0);
     this.progressBase = this.E0;
@@ -430,7 +432,12 @@ class Cascade {
     // Decide the keep-one branch BEFORE drawing, by a test that does not depend on the pick
     // (the largest possible new weight is w * sum / minE). Deciding after the draw made the
     // expected weights depend on energy: hard secondaries over-, soft ones under-weighted.
-    if (ep < this.eThin && (w * sum) / minE <= wmax) {
+    if (ep < this.eThin) {
+      // Weight limit reached for some possible pick: stop thinning here (keep all at w), the
+      // CORSIKA weight-limitation rule. Unbiased and energy-conserving; per-particle thinning
+      // in this regime conserves energy only on average and, with the interactive weight
+      // limit, let single records carry several times E0.
+      if ((w * sum) / minE > wmax) { out.fill(w); return; }
       // All below threshold: keep exactly one, chosen with probability E_i / sum.
       let u = this.rng.uniform() * sum;
       let pick = es.length - 1;

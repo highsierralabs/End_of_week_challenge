@@ -129,7 +129,7 @@ const tableCache = new Map<string, Float64Array>();
 
 /** Memoised acceptance table for a cube of the given edge and minimum chord. */
 export function acceptanceTable(edge: number, minChord: number): Float64Array {
-  const key = `/`;
+  const key = `${edge}/${minChord}`;
   let t = tableCache.get(key);
   if (!t) { t = crystalAcceptanceTable(edge, minChord, TABLE_T, TABLE_P); tableCache.set(key, t); }
   return t;
