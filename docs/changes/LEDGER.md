@@ -10,3 +10,4 @@
 | EOWC-CHG-20261126-006 | Integrate worker, GPU track replay, detector, stage and app; physics unit tests |
 | EOWC-CHG-20261126-007 | Rate mode, Observatory comparison with the RHACO snapshot, physics doc, licence, Pages workflow |
 | EOWC-CHG-20261126-008 | Visual tuning: camera presets, EM brightness, bloom, portrait framing, presentation mode, tour text fix |
+| EOWC-CHG-20261126-009 | Per-shower detector exposure line; READMEs and screenshots |

@@ -9,6 +9,8 @@ import type { ShowerParams, ShowerResult } from '../physics/types';
 import { SimClient } from '../sim/client';
 import { Stage, type CameraPreset } from '../render/stage';
 import { createObservatory } from '../ui/observatory';
+import { renderDetector } from '../ui/detectorCard';
+import { detectorExposure } from '../physics/detector';
 
 const q = new URLSearchParams(location.search);
 const layout = buildLayout(document.getElementById('app')!);
@@ -97,6 +99,7 @@ async function run(p: ShowerParams, camera?: string, play = true): Promise<void>
     stage?.load(r);
     charts.update(r);
     renderStats(layout.stats, r);
+    renderDetector(layout.stats.querySelector('.cx-panel-body') ?? layout.stats, detectorExposure(r));
     tNs = r.stats.tMin;
     playing = play;
     // Pick a replay speed that shows the whole shower in ~25 s.

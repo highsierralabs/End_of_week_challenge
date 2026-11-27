@@ -833,3 +833,8 @@ button { cursor: pointer; }
 /* presentation mode (H key or ?clean) */
 .cx-clean .cx-hud, .cx-clean .cx-toasts { display: none; }
 
+/* detector line in the readout */
+.cx-det { grid-column: 1 / -1; margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--hair); display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; font-family: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace; font-size: 11.5px; color: var(--text-2); cursor: help; }
+.cx-det-k { font-family: system-ui, sans-serif; font-size: 10.5px; font-weight: 650; letter-spacing: 0.12em; text-transform: uppercase; color: #8fb4ff; }
+.cx-det b { color: var(--text); font-weight: 600; }
+.cx-det-sep { color: var(--muted); }
