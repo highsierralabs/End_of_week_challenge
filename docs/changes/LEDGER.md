@@ -43,3 +43,4 @@
 | EOWC-DOC-20261127-008 | Drumhead README, screenshots, animated clips and clip recorder; layout avoids the info card; Weyl accuracy stated as measured |
 | EOWC-FIX-20261127-009 | Drumhead review fixes: worker handler leaked onto the page, NaN drive from rim taps, pitch slider in sand mode, stroke lost on load, degenerate share links, quiz race, Lanczos restart for repeated eigenvalues |
 | EOWC-CHG-20261127-010 | Drumhead Metal: free-edged Kirchhoff plates by a Legendre Ritz method, true Chladni figures, plate sound; validated against Porter (2017); sweep skips modes the driver cannot excite |
+| EOWC-REL-20261127-011 | Release Drumhead v1.0.0: manifest entry with card image, root README list, third-party notices |

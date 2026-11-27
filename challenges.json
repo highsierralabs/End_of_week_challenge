@@ -11,6 +11,18 @@
       "imageAlt": "A 1 PeV proton shower striking the ground under a night sky",
       "tech": ["WebGPU", "WebGL2 fallback", "three.js", "TypeScript"],
       "tag": "cascade-v1.0.0"
+    },
+    {
+      "slug": "drumhead",
+      "dir": "Drumhead",
+      "title": "Drumhead",
+      "tagline": "Draw a drum, hear its shape",
+      "summary": "Draw any shape and play it as a drum, or as a metal plate. Its vibration modes are solved in your browser, sand draws Chladni's figures on the still lines, and two different drums from Kac's famous question sound exactly alike. A listening game, a mode gallery and a validation page against published values come with it.",
+      "date": "2026-11-27",
+      "image": "Drumhead/docs/screenshots/card.jpg",
+      "imageAlt": "The two isospectral twin drums, struck, with vermilion and blue contours of their vibration",
+      "tech": ["WebGL2", "AudioWorklet", "Finite elements", "TypeScript"],
+      "tag": "drumhead-v1.0.0"
     }
   ]
 }

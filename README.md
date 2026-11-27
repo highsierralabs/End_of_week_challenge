@@ -8,6 +8,17 @@ further direction.
 
 ## The builds
 
+### 2. [Drumhead](Drumhead/): draw a drum, hear its shape (27 November 2026)
+
+![A guitar-shaped drum struck four times: two-ink contours of the membrane ripple and fade](Drumhead/docs/screenshots/play.gif)
+
+Draw any shape and play it as a drum. Its vibration modes are solved in the browser with finite elements and played
+by modal synthesis. Sand settles on the nodal lines; a Metal switch turns any shape into a free-edged plate that draws
+Chladni's own figures. The two Gordon-Webb-Wolpert drums from Kac's question "can one hear the shape of a drum?" sound
+exactly alike. A listening game, a mode gallery and a validation page against published eigenvalues come with it.
+
+**Live:** https://highsierralabs.github.io/End_of_week_challenge/drumhead/ · [Read more](Drumhead/README.md)
+
 ### 1. [Cascade](Cascade/): cosmic-ray air showers over the high desert (27 November 2026)
 
 ![Cascade: a 1 PeV proton shower replayed over Lemmon Valley, Nevada](Cascade/docs/screenshots/shower.gif)

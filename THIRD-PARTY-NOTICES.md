@@ -1,6 +1,8 @@
 # Third-party notices
 
-The built site contains three.js. Its licence text is reproduced below as the library ships it. Cascade's own licence is in [LICENSE](LICENSE).
+The built site contains three.js (in Cascade). Its licence text is reproduced below as the library ships it. The builds' own licence is in [LICENSE](LICENSE).
+
+Drumhead ships no third-party code, fonts or images. Its reference eigenvalues and the geometry of its isospectral drums are taken, as published facts with citation, from T. A. Driscoll, "Eigenmodes of isospectral drums", SIAM Review 39 (1997) 1-17 (Table 3.1 and Figure 1.1), and its free square plate reference values from R. Porter, "Eigenfrequencies and eigenmodes for a thin rectangular elastic plate with free edges", technical report, University of Bristol (2017), Table 1.
 
 ## three.js 0.187.0
 
