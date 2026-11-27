@@ -58,37 +58,21 @@ export function solveDrum(mesh: Mesh, want: number, onProgress?: (f: number) => 
 }
 
 /**
- * Weyl's law, with the perimeter correction: the number of eigenvalues below lambda is about
- *   N(lambda) = A lambda / 4pi - P sqrt(lambda) / 4pi + C.
- * Fitting it to the spectrum "hears" the area A and the perimeter P.
+ * Weyl's law with the perimeter correction: the number of eigenvalues below lambda is about
+ *   N(lambda) = A lambda / 4pi - P sqrt(lambda) / 4pi + 1/6,
+ * where 1/6 is the constant term for a smooth drum without holes (Kac 1966, Pleijel 1954). Fitting
+ * A and P to the spectrum "hears" the area and the perimeter. Only the first 48 modes are used:
+ * the mesh resolves them well, while higher ones come out increasingly sharp and would bias the fit.
  */
 export function hearShape(lambda: ArrayLike<number>): { area: number; perimeter: number } {
-  // Least squares on the staircase midpoints (lambda_i, i - 1/2), skipping the first few.
-  const rows: [number, number, number, number][] = [];
-  for (let i = 3; i < lambda.length; i++) {
+  let sxx = 0, sxy = 0, syy = 0, sbx = 0, sby = 0;
+  for (let i = 3; i < Math.min(48, lambda.length); i++) {
     const l = lambda[i]!;
-    rows.push([l / (4 * Math.PI), -Math.sqrt(l) / (4 * Math.PI), 1, i + 0.5]);
+    const x = l / (4 * Math.PI), y = -Math.sqrt(l) / (4 * Math.PI), b = i + 0.5 - 1 / 6;
+    sxx += x * x; sxy += x * y; syy += y * y; sbx += b * x; sby += b * y;
   }
-  const ata = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
-  const atb = [0, 0, 0];
-  for (const r of rows) for (let a = 0; a < 3; a++) { atb[a]! += r[a]! * r[3]; for (let b = 0; b < 3; b++) ata[a]![b]! += r[a]! * r[b]!; }
-  const x = solve3(ata, atb);
-  return { area: x[0]!, perimeter: x[1]! };
-}
-
-function solve3(a: number[][], b: number[]): number[] {
-  const m = a.map((r, i) => [...r, b[i]!]);
-  for (let c = 0; c < 3; c++) {
-    let p = c;
-    for (let r = c + 1; r < 3; r++) if (Math.abs(m[r]![c]!) > Math.abs(m[p]![c]!)) p = r;
-    [m[c], m[p]] = [m[p]!, m[c]!];
-    for (let r = 0; r < 3; r++) {
-      if (r === c) continue;
-      const f = m[r]![c]! / m[c]![c]!;
-      for (let k = c; k < 4; k++) m[r]![k]! -= f * m[c]![k]!;
-    }
-  }
-  return [m[0]![3]! / m[0]![0]!, m[1]![3]! / m[1]![1]!, m[2]![3]! / m[2]![2]!];
+  const det = sxx * syy - sxy * sxy;
+  return { area: (sbx * syy - sby * sxy) / det, perimeter: (sxx * sby - sxy * sbx) / det };
 }
 
 /** Faber-Krahn: the disc has the lowest fundamental of all shapes of the same area. */

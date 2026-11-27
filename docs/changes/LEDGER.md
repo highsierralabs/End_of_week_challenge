@@ -36,3 +36,4 @@
 | EOWC-CHG-20261127-001 | Multi-challenge Pages site: challenges.json manifest, site builder and index page, Cascade served at /cascade/, gate and workflow cover every challenge |
 | EOWC-DOC-20261127-002 | Weekly-series README, challenge contract (docs/CHALLENGES.md), governance rules 6, 8 and 11 |
 | EOWC-CHG-20261127-003 | Drumhead scaffold and solver: meshing, linear FEM, RCM banded Cholesky, shift-invert Lanczos; tests against exact square, disc and Driscoll (1997) GWW values |
+| EOWC-CHG-20261127-004 | Drumhead app: solver worker pool, WebGL2 two-ink renderer, AudioWorklet modal synthesis, Chladni sand, spectrum strip, mode gallery, twins view, About text, phone layout |

@@ -95,10 +95,15 @@ describe('you cannot hear the shape of a drum', () => {
   });
 
   it('Weyl hears the area and the perimeter', () => {
-    const d = solveDrum(gwwMesh('left', 1, 5), 80);
+    const d = solveDrum(gwwMesh('left', 1, 5), 64);
     const h = hearShape(d.lambda);
-    expect(rel(h.area, 14)).toBeLessThan(0.08);
-    expect(rel(h.perimeter, polyPerimeter([...GWW.left.outline]))).toBeLessThan(0.25);
+    expect(rel(h.area, 14)).toBeLessThan(0.04);
+    expect(rel(h.perimeter, polyPerimeter([...GWW.left.outline]))).toBeLessThan(0.06);
+    // A freehand-style lattice drum (the circle) at the interactive size.
+    const c = solveDrum(PRESETS.find((p) => p.id === 'circle')!.mesh(2600), 64);
+    const hc = hearShape(c.lambda);
+    expect(rel(hc.area, c.area)).toBeLessThan(0.05);
+    expect(rel(hc.perimeter, c.perimeter)).toBeLessThan(0.1);
   });
 });
 

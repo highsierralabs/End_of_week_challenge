@@ -83,10 +83,15 @@ function heart(n = 200): Poly {
   return p;
 }
 
+/** Metres per paper unit for the playable twins: area 14 * s^2, about a timpani head's. */
+export const GWW_SCALE = 0.155;
+
 export interface Preset {
   id: string;
   name: string;
   note: string;
+  /** The outline, for icons. */
+  outline: Poly;
   mesh: (detail: number) => Mesh;
 }
 
@@ -96,38 +101,42 @@ function levelsFor(pieces: number, detail: number): number {
   return Math.max(2, Math.round(Math.log(Math.max(1, (2 * detail) / pieces)) / Math.log(4)));
 }
 
-const lattice = (p: Poly) => (detail: number) => latticeMesh(p, detail)!;
+const lattice = (p: Poly) => ({ outline: p, mesh: (detail: number) => latticeMesh(p, detail)! });
+const SQ = 0.28;
+const TRI = (() => { const r = 0.38; return [0, r, -r * Math.sin(Math.PI / 3), -r / 2, r * Math.sin(Math.PI / 3), -r / 2].map((v, i) => (i % 2 ? v - 0.04 : v)); })();
+const ELL = 0.21;
 
 export const PRESETS: Preset[] = [
-  { id: 'circle', name: 'Circle', note: 'A timpani head, 66 cm across.', mesh: lattice(circle(0.33)) },
+  { id: 'circle', name: 'Circle', note: 'A timpani head, 66 cm across.', ...lattice(circle(0.33)) },
   {
-    id: 'square', name: 'Square', note: 'Modes that share a pitch in pairs: (m, n) and (n, m).',
-    mesh: (d) => refineTriangles([[-0.28, -0.28, 0.28, -0.28, 0.28, 0.28], [-0.28, -0.28, 0.28, 0.28, -0.28, 0.28]], levelsFor(2, d),
-      [-0.28, -0.28, 0.28, -0.28, 0.28, 0.28, -0.28, 0.28]),
+    id: 'square', name: 'Square', note: 'Its modes come in pairs that share a pitch: (m, n) and (n, m).',
+    outline: [-SQ, -SQ, SQ, -SQ, SQ, SQ, -SQ, SQ],
+    mesh: (d) => refineTriangles([[-SQ, -SQ, SQ, -SQ, SQ, SQ], [-SQ, -SQ, SQ, SQ, -SQ, SQ]], levelsFor(2, d), [-SQ, -SQ, SQ, -SQ, SQ, SQ, -SQ, SQ]),
   },
   {
-    id: 'triangle', name: 'Triangle', note: 'An equilateral triangle, one of the few shapes with exact modes.',
-    mesh: (d) => {
-      const r = 0.38, t = [0, r, -r * Math.sin(Math.PI / 3), -r / 2, r * Math.sin(Math.PI / 3), -r / 2].map((v, i) => (i % 2 ? v - 0.04 : v));
-      return refineTriangles([t], levelsFor(1, d), t);
-    },
+    id: 'triangle', name: 'Triangle', note: 'The equilateral triangle: one of the few shapes whose modes are known exactly.',
+    outline: TRI,
+    mesh: (d) => refineTriangles([TRI], levelsFor(1, d), TRI),
   },
   {
-    id: 'ell', name: 'L-shape', note: 'A re-entrant corner bends the modes around it.',
+    id: 'ell', name: 'L-shape', note: 'A re-entrant corner bends every mode around it.',
+    outline: [-ELL, -ELL, ELL, -ELL, ELL, 0, 0, 0, 0, ELL, -ELL, ELL],
     mesh: (d) => {
-      const a = 0.21;
+      const a = ELL;
       const sq = (x: number, y: number) => [[x, y, x + a, y, x + a, y + a], [x, y, x + a, y + a, x, y + a]];
-      const pieces = [...sq(-a, -a), ...sq(0, -a), ...sq(-a, 0)].map((t) => t.map((v) => v + 0.0));
-      return refineTriangles(pieces, levelsFor(6, d), [-a, -a, a, -a, a, 0, 0, 0, 0, a, -a, a]);
+      return refineTriangles([...sq(-a, -a), ...sq(0, -a), ...sq(-a, 0)], levelsFor(6, d), [-a, -a, a, -a, a, 0, 0, 0, 0, a, -a, a]);
     },
   },
-  { id: 'stadium', name: 'Stadium', note: 'Bunimovich\'s stadium: its waves wander chaotically.', mesh: lattice(stadium(0.2, 0.17)) },
-  { id: 'guitar', name: 'Guitar', note: 'A guitar-like body with a waist.', mesh: lattice(guitar()) },
-  { id: 'star', name: 'Star', note: 'Five points, five deep corners.', mesh: lattice(star(5, 0.42, 0.19)) },
-  { id: 'heart', name: 'Heart', note: 'A heart, because why not.', mesh: lattice(heart()) },
-  { id: 'gww-left', name: 'Twin A', note: 'One of the Gordon-Webb-Wolpert drums.', mesh: (d) => gwwMesh('left', GWW_SCALE, levelsFor(7, d)) },
-  { id: 'gww-right', name: 'Twin B', note: 'The other Gordon-Webb-Wolpert drum.', mesh: (d) => gwwMesh('right', GWW_SCALE, levelsFor(7, d)) },
+  { id: 'stadium', name: 'Stadium', note: 'The Bunimovich stadium, whose waves wander chaotically.', ...lattice(stadium(0.2, 0.17)) },
+  { id: 'guitar', name: 'Guitar', note: 'A guitar-like body with a waist.', ...lattice(guitar()) },
+  { id: 'star', name: 'Star', note: 'Five points and five deep corners.', ...lattice(star(5, 0.42, 0.19)) },
+  { id: 'heart', name: 'Heart', note: 'A heart, because why not.', ...lattice(heart()) },
+  {
+    id: 'gww-left', name: 'Twin A', note: 'One of the Gordon-Webb-Wolpert drums.',
+    outline: scalePoly(GWW.left.outline, GWW_SCALE), mesh: (d) => gwwMesh('left', GWW_SCALE, levelsFor(7, d)),
+  },
+  {
+    id: 'gww-right', name: 'Twin B', note: 'The other Gordon-Webb-Wolpert drum.',
+    outline: scalePoly(GWW.right.outline, GWW_SCALE), mesh: (d) => gwwMesh('right', GWW_SCALE, levelsFor(7, d)),
+  },
 ];
-
-/** Metres per paper unit for the playable twins: area 14 * s^2, about a timpani head's. */
-export const GWW_SCALE = 0.155;
