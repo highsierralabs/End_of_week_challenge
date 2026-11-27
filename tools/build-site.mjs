@@ -10,13 +10,17 @@
 //   1.0  2026-11-27  Initial release.
 //   1.1  2026-11-27  Optional animated clip per entry (manifest "clip"); the still image stays as the
 //                    picture for visitors who ask for reduced motion.
-import { spawnSync } from 'node:child_process';
+//   1.2  2026-11-27  Repository URL from the manifest, else the CI repository or the origin remote, so a
+//                    fork builds links to itself; owner name for the index header; placeholders filled
+//                    wherever they occur.
+import { execFileSync, spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const root = join(import.meta.dirname, '..');
 const RESERVED = new Set(['assets', 'index.html', 'license', 'third-party-notices.md']);
+const FALLBACK_REPO = 'https://github.com/highsierralabs/End_of_week_challenge';
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October',
   'November', 'December'];
 
@@ -43,10 +47,24 @@ export function loadManifest() {
     if (c.clip && !c.image) findings.push(`${id}: clip needs a still image for reduced motion`);
   }
   if (findings.length) throw new Error(findings.join('\n'));
+  const repo = manifest.repo ?? repoFromEnvironment() ?? FALLBACK_REPO;
   return {
-    repo: manifest.repo ?? 'https://github.com/highsierralabs/End_of_week_challenge',
+    repo,
+    owner: manifest.owner ?? repo.split('/').at(-2),
     challenges: list.map((c) => ({ ...c, npm: existsSync(join(root, c.dir, 'package.json')), out: c.out ?? 'dist' })),
   };
+}
+
+// A fork links to itself: the repository GitHub Actions is building, else the origin remote.
+function repoFromEnvironment() {
+  if (process.env.GITHUB_REPOSITORY) return `${process.env.GITHUB_SERVER_URL ?? 'https://github.com'}/${process.env.GITHUB_REPOSITORY}`;
+  try {
+    const url = execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const m = url.match(/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?\/?$/);
+    return m ? `https://github.com/${m[1]}` : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -96,7 +114,7 @@ function main() {
 
   let manifest;
   try { manifest = loadManifest(); } catch (e) { console.log(e.message); console.log('site: FAIL'); process.exit(1); }
-  const { repo, challenges } = manifest;
+  const { repo, owner, challenges } = manifest;
 
   rmSync(site, { recursive: true, force: true });
   mkdirSync(join(site, 'assets'), { recursive: true });
@@ -130,9 +148,10 @@ function main() {
   const numbered = [...challenges].sort((a, b) => a.date.localeCompare(b.date)).map((c, i) => ({ c, n: i + 1 }));
   const entries = numbered.reverse().map(({ c, n }) => entryHtml(c, n, repo)).join('\n');
   const index = readFileSync(join(root, 'site', 'index.html'), 'utf8')
-    .replace('<!-- CHALLENGES -->', entries)
-    .replace('<!-- COUNT -->', `${challenges.length} so far`)
-    .replace('<!-- REPO -->', repo);
+    .replaceAll('<!-- CHALLENGES -->', entries)
+    .replaceAll('<!-- COUNT -->', `${challenges.length} so far`)
+    .replaceAll('<!-- REPO -->', repo)
+    .replaceAll('<!-- OWNER -->', esc(owner));
   if (/<!-- [A-Z]+ -->/.test(index)) fail('index.html still has an unfilled placeholder');
   writeFileSync(join(site, 'index.html'), index);
 

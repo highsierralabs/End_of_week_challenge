@@ -60,6 +60,10 @@ Either way the output must have an `index.html` and must work from a subfolder. 
 | `out` | Optional output folder inside `dir`. The default is `dist`. |
 | `tag` | Optional release tag, for reference. |
 
+Two optional keys sit at the top of `challenges.json`, beside `challenges`: `owner`, the name that heads the index page
+(by default the GitHub owner), and `repo`, the repository the site links to (by default the one GitHub Actions is
+building, or else the `origin` remote, so a fork links to itself).
+
 **A folder that is not in the manifest is not built and not deployed.** Its source is still public as soon as it is
 pushed, so the public-safety scan applies from the first commit. Add the manifest entry when the challenge is ready to
 be seen.

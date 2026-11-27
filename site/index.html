@@ -68,6 +68,9 @@
         color: var(--muted);
       }
       .lede strong { color: var(--text); font-weight: 500; }
+      .skill { max-width: 38em; margin: 18px 0 0; color: var(--muted); }
+      .skill code { color: var(--text); font-size: 0.95em; }
+      .skill a { color: var(--accent); text-underline-offset: 4px; }
 
       .count {
         display: flex;
@@ -174,12 +177,17 @@
   <body>
     <div class="wrap">
       <header>
-        <p class="eyebrow">High Sierra Labs</p>
+        <p class="eyebrow"><!-- OWNER --></p>
         <h1>End of week challenge</h1>
         <p class="lede">
-          A Claude Code subscription resets every Friday morning. Whatever is left of the week's allowance before then
-          goes into <strong>one build that Claude picks, designs and ships on its own</strong>: seven questions at the
+          A Claude Code subscription's allowance resets once a week. Whatever is left of it before then goes
+          into <strong>one build that Claude picks, designs and ships on its own</strong>: seven questions at the
           start, then no further direction.
+        </p>
+        <p class="skill">
+          The series runs on one Claude Code skill, <code>/end-of-week-challenge</code>, which lives in the
+          repository. <a href="<!-- REPO -->/blob/main/.claude/skills/end-of-week-challenge/SKILL.md">Read the
+          skill</a> or <a href="<!-- REPO -->#run-your-own">run your own series</a>.
         </p>
       </header>
 
