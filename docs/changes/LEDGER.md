@@ -20,3 +20,5 @@
 | EOWC-DOC-20261126-016 | Findings note for the RHACO observatory |
 | EOWC-CHG-20261126-017 | Split big showers across the worker pool; readout flags Xmax past the ground |
 | EOWC-DOC-20261126-018 | Physics doc: split showers and sky mode; architecture table matches the tree |
+| EOWC-FIX-20261126-019 | Review fixes: unbiased thinning fallback, lone secondary, horizontal ground check, shared crystal/lead model |
+| EOWC-FIX-20261126-020 | QA fixes: replay window, quality param validation, EM-off readout |

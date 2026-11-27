@@ -31,7 +31,8 @@ export function renderStats(el: HTMLElement, r: ShowerResult): void {
   const gh = st.gh;
   // A maximum past the ground is an extrapolation of the fit, not a measurement of the profile.
   const beyond = gh && Number.isFinite(gh.xmax) && gh.xmax > r.stats.groundSlantDepth - 15;
-  cells.push(cell(beyond ? 'Xmax · past ground' : 'Xmax · fit', gh && Number.isFinite(gh.xmax) ? (beyond ? `> ${r.stats.groundSlantDepth.toFixed(0)} g/cm²` : `${gh.xmax.toFixed(0)} g/cm²`) : 'no fit',
+  const emOff = !p.trackEm;
+  cells.push(cell(emOff ? 'Xmax' : beyond ? 'Xmax · past ground' : 'Xmax · fit', emOff ? 'EM off' : gh && Number.isFinite(gh.xmax) ? (beyond ? `> ${r.stats.groundSlantDepth.toFixed(0)} g/cm²` : `${gh.xmax.toFixed(0)} g/cm²`) : 'no fit',
     Number.isFinite(ref) ? `HM ref. ${ref.toFixed(0)}${gh ? ` (${signed(gh.xmax - ref)})` : ''}` : ''));
   cells.push(cell('Nmax', gh && Number.isFinite(gh.nmax) ? si(gh.nmax) : '—', 'charged, at Xmax'));
 
@@ -51,7 +52,7 @@ export function renderStats(el: HTMLElement, r: ShowerResult): void {
 
   const ne = (gc[RClass.ELECTRON] ?? 0) + (gc[RClass.POSITRON] ?? 0);
   const nmu = gc[RClass.MUON] ?? 0;
-  cells.push(cell('Muons per e±', ne > 0 ? ratio(nmu / ne) : nmu > 0 ? '∞' : '—', `${si(nmu)} μ / ${si(ne)} e±`));
+  cells.push(cell('Muons per e±', emOff ? 'EM off' : ne > 0 ? ratio(nmu / ne) : nmu > 0 ? 'no e±' : '—', `${si(nmu)} μ / ${si(ne)} e±`));
   cells.push(cell('CPU', st.cpuMs >= 1000 ? `${(st.cpuMs / 1000).toFixed(2)} s` : `${st.cpuMs.toFixed(0)} ms`,
     `${si(st.particlesTracked)} tracked · ${si(st.interactions)} int.`));
   cells.push(cell('Thinning', p.thinning > 0 ? `ε = ${sci(p.thinning)}` : 'off',

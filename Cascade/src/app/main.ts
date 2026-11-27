@@ -6,7 +6,7 @@ import {
 } from '../ui';
 import { DEFAULT_PARAMS } from '../physics/cascade';
 import { DEFAULT_SKY } from '../physics/sky';
-import type { ShowerParams, ShowerResult } from '../physics/types';
+import { GND, GND_STRIDE, type ShowerParams, type ShowerResult } from '../physics/types';
 import { SimClient } from '../sim/client';
 import { Stage, type CameraPreset } from '../render/stage';
 import { createObservatory } from '../ui/observatory';
@@ -19,7 +19,8 @@ const layout = buildLayout(document.getElementById('app')!);
 const charts = new ChartsPanel(layout.charts);
 renderStatsEmpty(layout.stats, 'Simulating the first shower...');
 
-let quality: Quality = (q.get('quality') as Quality | null) ?? (isPhoneLayout() ? 'low' : 'medium');
+const qParam = q.get('quality');
+let quality: Quality = qParam === 'low' || qParam === 'medium' || qParam === 'high' ? qParam : isPhoneLayout() ? 'low' : 'medium';
 const SEGMENTS: Record<Quality, number> = { low: 150_000, medium: 450_000, high: 1_000_000 };
 
 const initial: ShowerParams = {
@@ -34,18 +35,34 @@ let playing = false;
 let tNs = 0;
 let nsPerSecond = 5000;
 let stage: Stage | null = null;
+/** The part of the shower clock the replay plays: from just before the first interaction
+ *  to just after nearly all ground arrivals (a few slow hadrons would otherwise add seconds of empty tail). */
+let win = { t0: 0, t1: 1 };
+function replayWindow(r: ShowerResult, sky: boolean): { t0: number; t1: number } {
+  const t0 = sky ? r.stats.tMin : Math.max(r.stats.tMin, -4000);
+  const n = r.groundCount;
+  let t1 = r.stats.tMax;
+  if (n > 20 && !sky) {
+    const stride = Math.max(1, Math.floor(n / 20000));
+    const ts: number[] = [];
+    for (let i = 0; i < n; i += stride) ts.push(r.ground[i * GND_STRIDE + GND.T]!);
+    ts.sort((a, b) => a - b);
+    t1 = Math.min(r.stats.tMax, ts[Math.floor(ts.length * 0.995)]! + 4000);
+  }
+  return { t0, t1: Math.max(t1, t0 + 1000) };
+}
 let userCamera = false;
 
 const timeline = createTimeline(layout.timeline, {
   onPlayPause: () => {
     if (!result) return;
-    if (!playing && tNs >= result.stats.tMax) tNs = result.stats.tMin;
+    if (!playing && tNs >= win.t1) tNs = win.t0;
     playing = !playing;
     pushTime();
   },
   onSeek: (f) => {
     if (!result) return;
-    tNs = result.stats.tMin + f * (result.stats.tMax - result.stats.tMin);
+    tNs = win.t0 + f * (win.t1 - win.t0);
     pushTime();
   },
   onSpeed: (v) => { nsPerSecond = v; pushTime(); },
@@ -54,7 +71,7 @@ const timeline = createTimeline(layout.timeline, {
 function pushTime(): void {
   const st = result?.stats;
   timeline.setState({
-    playing, tNs, tMinNs: st?.tMin ?? 0, tMaxNs: st?.tMax ?? 1, nsPerSecond,
+    playing, tNs, tMinNs: st ? win.t0 : 0, tMaxNs: st ? win.t1 : 1, nsPerSecond,
     markers: st && Number.isFinite(st.tCore) ? [{ tNs: st.tCore, label: 'core at ground' }] : [],
   });
   charts.setTime(tNs);
@@ -81,7 +98,7 @@ const tour = createTour(layout.overlay, {
       return;
     }
     if (s.camera) { controls.setCameraPreset(s.camera); stage?.setPreset(s.camera as CameraPreset); }
-    if (s.play && result) { tNs = result.stats.tMin; playing = true; }
+    if (s.play && result) { tNs = win.t0; playing = true; }
   },
   onClose: () => undefined,
 });
@@ -115,11 +132,11 @@ async function run(p: ShowerParams, camera?: string, play = true): Promise<void>
     charts.update(r);
     renderStats(layout.stats, r);
     renderDetector(layout.stats.querySelector('.cx-panel-body') ?? layout.stats, detectorExposure(r));
-    tNs = r.stats.tMin;
+    win = replayWindow(r, false);
+    tNs = win.t0;
     playing = play;
     // Pick a replay speed that shows the whole shower in ~25 s.
-    const span = r.stats.tMax - r.stats.tMin;
-    nsPerSecond = Math.max(200, Math.min(100000, span / 25));
+    nsPerSecond = Math.max(200, Math.min(100000, (win.t1 - win.t0) / 25));
     const preset = (camera ?? (userCamera ? stage?.getPreset() : 'overview')) as CameraPreset;
     controls.setCameraPreset(preset === 'sky' ? null : preset);
     stage?.setPreset(preset === 'sky' ? 'overview' : preset);
@@ -154,9 +171,10 @@ async function runSky(): Promise<void> {
     const eMax = Math.max(...info.energiesEV);
     note.innerHTML = `<span class="cx-det-k">Sky mode</span><span>${info.showers} showers above ${(opts.eMinEV / 1e12).toFixed(0)} TeV landing in an ${(2 * opts.halfWidthM / 1000).toFixed(0)} km square during <b>${(info.realSpanSeconds * 1e6).toFixed(0)} &micro;s</b> of real time (about ${(info.ratePerSecond / 1000).toFixed(0)} thousand per second). Energies follow the spectrum; the readout and charts show the largest, ${(eMax / 1e12).toFixed(0)} TeV ${info.primaries[info.brightest]}.</span>`;
     body.append(note);
-    tNs = r.stats.tMin;
+    win = replayWindow(r, true);
+    tNs = win.t0;
     playing = true;
-    nsPerSecond = Math.max(200, Math.min(100000, (r.stats.tMax - r.stats.tMin) / 30));
+    nsPerSecond = Math.max(200, Math.min(100000, (win.t1 - win.t0) / 30));
     stage?.setPreset('sky');
     controls.setCameraPreset(null);
     pushTime();
@@ -186,7 +204,7 @@ async function start(): Promise<void> {
     last = now;
     if (playing && result) {
       tNs += dt * nsPerSecond;
-      if (tNs >= result.stats.tMax) { tNs = result.stats.tMax; playing = false; }
+      if (tNs >= win.t1) { tNs = win.t1; playing = false; }
       pushTime();
     }
     if (result) {
