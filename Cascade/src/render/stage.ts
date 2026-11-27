@@ -81,7 +81,7 @@ export class Stage {
     new ResizeObserver(() => this.resize()).observe(this.container);
     const scenePass = pass(this.scene, this.camera);
     const color = scenePass.getTextureNode('output');
-    this.bloomNode = bloom(color, 0.55, 0.35, 0.3);
+    this.bloomNode = bloom(color, 0.45, 0.3, 0.55);
     this.pipeline = new THREE.RenderPipeline(this.renderer);
     this.pipeline.outputNode = color.add(this.bloomNode);
     try {
@@ -177,14 +177,19 @@ export class Stage {
           break;
         case 'follow':
           target = this.frontPoint(0);
-          pos = target.clone().addScaledVector(side, 1800).add(new THREE.Vector3(0, 700, 0)).addScaledVector(axR, -900);
+          pos = target.clone().addScaledVector(side, 3200).add(new THREE.Vector3(0, 600, 0)).addScaledVector(axR, -1800);
           this.lastFrontTarget = target.clone();
           break;
         default:
-          target = mid.clone().lerp(core, 0.25);
-          pos = target.clone().addScaledVector(side, height * 0.9).add(new THREE.Vector3(0, height * 0.12, 0)).addScaledVector(axR, -height * 0.35);
+          // Three-quarter view of the lower shower, the footprint and the valley behind it.
+          target = this.axisPoint(r.params.groundAltitudeM + Math.min(3500, height * 0.25));
+          pos = target.clone().addScaledVector(side, Math.min(9000, height * 0.55)).add(new THREE.Vector3(0, -Math.min(2000, height * 0.1), 0)).addScaledVector(axR, -Math.min(4000, height * 0.2));
           void top;
       }
+    }
+    // Portrait screens see a narrower horizontal field: back off so the shower still fits.
+    if (this.camera.aspect < 1 && p !== 'detector') {
+      pos = target.clone().add(pos.clone().sub(target).multiplyScalar(Math.pow(1 / this.camera.aspect, 0.75)));
     }
     if (pos.y < 2) pos.y = 2;
     this.flyTo(pos, target, animate ? 1.6 : 0);

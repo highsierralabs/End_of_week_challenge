@@ -90,7 +90,7 @@ export class Detector {
   update(camera: THREE.Camera): void {
     const d = camera.position.length();
     const s = THREE.MathUtils.clamp(d / 300, 0.02, 60);
-    this.beacon.scale.set(4 * s, 400 * s, 1);
+    this.beacon.scale.set(1.6 * s, 400 * s, 1);
     this.beacon.position.y = 200 * s;
     this.beacon.rotation.y = Math.atan2(camera.position.x, camera.position.z);
     this.ring.scale.setScalar(THREE.MathUtils.clamp(d / 60, 0.4, 400));

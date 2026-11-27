@@ -166,8 +166,9 @@ export const TOUR: TourStep[] = [
       the ground. Thirty millimetres of lead is about 5.3 radiation lengths (<i>X</i>₀ = 5.6 mm in lead), which stops
       most of the remaining soft electromagnetic particles and blocks much of the local gamma background.</p>
       <p>A muon crosses that lead losing only about 40 MeV and leaves a few MeV in a centimetre of crystal. At sea
-      level about one muon per cm² per minute crosses a horizontal surface, and a little more at this altitude, so a
-      crystal of about 1 cm³ sees a muon every minute or so. Almost every one is a lone muon from a small shower
+      level about one muon per cm² per minute crosses a horizontal surface, and about a third more at this altitude, so a
+      crystal of about 1 cm³ sees one or two muons a minute (the <b>Data</b> panel has Cascade's estimate next to the
+      observatory's measured rate). Almost every one is a lone muon from a small shower
       whose other particles landed far away. Even a big shower with 10 particles per m² puts only about 10<sup>−3</sup>
       of a particle on each cm². Neutrons and secondaries made in the lead also contribute; Cascade does not model
       them.</p>`,

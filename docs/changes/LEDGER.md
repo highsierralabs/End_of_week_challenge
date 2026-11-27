@@ -9,3 +9,4 @@
 | EOWC-CHG-20261126-005 | Aggregate RHACO data snapshot and its generator |
 | EOWC-CHG-20261126-006 | Integrate worker, GPU track replay, detector, stage and app; physics unit tests |
 | EOWC-CHG-20261126-007 | Rate mode, Observatory comparison with the RHACO snapshot, physics doc, licence, Pages workflow |
+| EOWC-CHG-20261126-008 | Visual tuning: camera presets, EM brightness, bloom, portrait framing, presentation mode, tour text fix |

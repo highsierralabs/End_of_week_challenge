@@ -829,3 +829,7 @@ button { cursor: pointer; }
   .cx-obs-cards, .cx-obs-charts { grid-template-columns: 1fr; }
   .cx-obs-canvas { height: 220px; }
 }
+
+/* presentation mode (H key or ?clean) */
+.cx-clean .cx-hud, .cx-clean .cx-toasts { display: none; }
+

@@ -34,13 +34,13 @@ export class ShowerLayer {
   readonly uTime = uniform(0);
   readonly uWidth = uniform(1.6);
   readonly uFade = uniform(4000);
-  readonly uPersist = uniform(0.12);
+  readonly uPersist = uniform(0.07);
   readonly uIntensity = uniform(1);
   readonly uSplash = uniform(1);
   readonly uDpr = uniform(1);
   readonly uDensity = uniform(1);
   /** Per-class brightness (photons are numerous; keep them a soft glow). */
-  readonly classGain = uniformArray([0.28, 1, 1, 1.6, 1.8], 'float');
+  readonly classGain = uniformArray([0.14, 0.62, 0.62, 0.85, 1.8], 'float');
   private density = 1;
   readonly mask = uniformArray(new Array<number>(RCLASS_COUNT).fill(1), 'float');
   readonly palette: ReturnType<typeof uniformArray>;

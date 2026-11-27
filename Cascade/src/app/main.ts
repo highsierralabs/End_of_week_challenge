@@ -141,6 +141,14 @@ async function start(): Promise<void> {
   });
 }
 
+// H hides the interface (presentation mode); ?clean starts with it hidden.
+if (q.has('clean')) document.documentElement.classList.add('cx-clean');
+window.addEventListener('keydown', (e) => {
+  const t = e.target as HTMLElement | null;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
+  if (e.key === 'h' || e.key === 'H') document.documentElement.classList.toggle('cx-clean');
+});
+
 void start();
 void run(controls.getParams());
 // Expose a tiny hook for automated screenshots and debugging.
