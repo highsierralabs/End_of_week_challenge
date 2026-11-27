@@ -17,3 +17,4 @@
 | EOWC-CHG-20261126-013 | Shower-core hit-rate estimate and the Data panel section comparing it with the EAS categories |
 | EOWC-CHG-20261126-014 | Sky mode: Poisson-timed showers from the spectrum over the valley |
 | EOWC-CHG-20261126-015 | Sky mode on a worker pool (plan / simulate / merge), 9 s to 2 s |
+| EOWC-DOC-20261126-016 | Findings note for the RHACO observatory |

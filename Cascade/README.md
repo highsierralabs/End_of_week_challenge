@@ -92,7 +92,8 @@ year at most. The classifier's EAS categories fire about 2 times a day. Whatever
 are not mostly multi-particle shower cores, which is consistent with the observatory's own rule that the classifier
 labels categories, not physics. The Data panel works through the
 estimates, why they differ, and what measurement would settle it. The aggregate snapshot and its provenance are
-described in [docs/rhaco_snapshot.md](docs/rhaco_snapshot.md).
+described in [docs/rhaco_snapshot.md](docs/rhaco_snapshot.md), and the findings are collected for the observatory in
+[docs/rhaco_findings.md](docs/rhaco_findings.md).
 
 ## Run it locally
 
