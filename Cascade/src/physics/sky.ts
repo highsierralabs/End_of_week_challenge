@@ -4,7 +4,7 @@
 // simulated and merged into one replay on a common clock.
 import { simulateShower, DEFAULT_PARAMS } from './cascade';
 import { Rng } from './rng';
-import { GND_STRIDE, RCLASS_COUNT, SEG_STRIDE, type Primary, type ShowerResult } from './types';
+import { GND_STRIDE, RCLASS_COUNT, SEG_STRIDE, type Primary, type ShowerParams, type ShowerResult } from './types';
 
 export interface SkyOptions {
   showers: number;
@@ -50,86 +50,114 @@ function integralFlux(eEV: number): number {
   return below + (atKnee * knee) / 2.1;
 }
 
-export function simulateSky(o: SkyOptions, onProgress?: (f: number, tracked: number) => void): { result: ShowerResult; info: SkyInfo; brightest: ShowerResult } {
+export interface SkyPlan {
+  options: SkyOptions;
+  /** Parameters of each shower, in arrival order. */
+  params: ShowerParams[];
+  /** Arrival time of each shower's core at the ground, ns. */
+  arrivals: number[];
+  ratePerSecond: number;
+}
+
+/** Draw the showers: Poisson arrivals, energies, composition, directions, cores. Pure and seeded. */
+export function planSky(o: SkyOptions): SkyPlan {
   const rng = new Rng(o.seed);
   const perShower = Math.max(2000, Math.floor(o.maxSegments / o.showers));
-  const segs: Float32Array[] = [];
-  const gnds: Float32Array[] = [];
-  const energies: number[] = [];
-  const prims: Primary[] = [];
-  let tracked = 0;
-  let best: ShowerResult | null = null;
-  let bestShift = 0;
-  let bestE = 0;
-  let segTotal = 0, gndTotal = 0;
-  let tMin = Infinity, tMax = -Infinity;
-  const profiles: ShowerResult['profile'][] = [];
   const area = (2 * o.halfWidthM) ** 2;
   const rate = integralFlux(o.eMinEV) * Math.PI * 0.75 * area; // showers per second above eMin into the square
+  const params: ShowerParams[] = [];
+  const arrivals: number[] = [];
   let tArrive = 0;
-  let firstCore = Infinity;
   for (let k = 0; k < o.showers; k++) {
     tArrive += rng.exp(1e9 / rate); // ns
-    // Differential spectrum E^-2.7 (inverse CDF); the knee is above where most land anyway.
+    // Differential spectrum E^-2.7 (inverse CDF); the knee is above where nearly all of them land.
     const a = Math.pow(o.eMinEV, -1.7), bq = Math.pow(o.eMaxEV, -1.7);
     const E = Math.pow(a - rng.uniform() * (a - bq), -1 / 1.7);
     const u = rng.uniform();
     const primary: Primary = u < 0.45 ? 'proton' : u < 0.75 ? 'helium' : u < 0.9 ? 'nitrogen' : 'iron';
     const cosT = Math.sqrt(1 - rng.uniform() * 0.75); // up to 60 deg, flux through a horizontal plane
-    const r = simulateShower({
-      ...DEFAULT_PARAMS,
-      primary,
-      energyEV: E,
-      zenithDeg: (Math.acos(cosT) * 180) / Math.PI,
-      azimuthDeg: 360 * rng.uniform(),
-      seed: (o.seed * 7919 + k * 104729) >>> 0,
-      thinning: o.thinning,
-      maxSegments: perShower,
-      coreX: (rng.uniform() * 2 - 1) * o.halfWidthM,
-      coreY: (rng.uniform() * 2 - 1) * o.halfWidthM,
-      recordTracks: true,
+    const azimuthDeg = 360 * rng.uniform();
+    const coreX = (rng.uniform() * 2 - 1) * o.halfWidthM;
+    const coreY = (rng.uniform() * 2 - 1) * o.halfWidthM;
+    params.push({
+      ...DEFAULT_PARAMS, primary, energyEV: E, zenithDeg: (Math.acos(cosT) * 180) / Math.PI, azimuthDeg,
+      seed: (o.seed * 7919 + k * 104729) >>> 0, thinning: o.thinning, maxSegments: perShower, coreX, coreY, recordTracks: true,
     });
-    tracked += r.stats.particlesTracked;
-    // Put the core's arrival at its Poisson arrival time.
-    const shift = tArrive - r.stats.tCore;
-    firstCore = Math.min(firstCore, tArrive);
+    arrivals.push(tArrive);
+  }
+  return { options: o, params, arrivals, ratePerSecond: rate };
+}
+
+/** Put every simulated shower on the common clock and merge them into one replay. Mutates the inputs' arrays. */
+export function mergeSky(plan: SkyPlan, showers: ShowerResult[]): { result: ShowerResult; info: SkyInfo; brightest: ShowerResult } {
+  let tracked = 0, segTotal = 0, gndTotal = 0;
+  let tMin = Infinity, tMax = -Infinity;
+  let bi = 0;
+  const shifts: number[] = [];
+  showers.forEach((r, k) => {
+    const shift = plan.arrivals[k]! - r.stats.tCore;
+    shifts.push(shift);
     const s = r.segments;
     for (let i = 0; i < r.segmentCount; i++) { s[i * SEG_STRIDE + 3]! += shift; s[i * SEG_STRIDE + 7]! += shift; }
     const g = r.ground;
     for (let i = 0; i < r.groundCount; i++) g[i * GND_STRIDE + 2]! += shift;
     tMin = Math.min(tMin, r.stats.tMin + shift);
     tMax = Math.max(tMax, r.stats.tMax + shift);
-    segs.push(s); gnds.push(g); segTotal += r.segmentCount; gndTotal += r.groundCount;
-    profiles.push(r.profile);
-    energies.push(E); prims.push(primary);
-    if (E > bestE) { bestE = E; best = r; bestShift = shift; }
-    onProgress?.((k + 1) / o.showers, tracked);
-  }
+    tracked += r.stats.particlesTracked;
+    segTotal += r.segmentCount;
+    gndTotal += r.groundCount;
+    if (plan.params[k]!.energyEV > plan.params[bi]!.energyEV) bi = k;
+  });
   const segments = new Float32Array(segTotal * SEG_STRIDE);
-  let off = 0;
-  for (const s of segs) { segments.set(s, off); off += s.length; }
   const ground = new Float32Array(gndTotal * GND_STRIDE);
-  off = 0;
-  for (const g of gnds) { ground.set(g, off); off += g.length; }
+  let so = 0, go = 0;
+  for (const r of showers) {
+    segments.set(r.segments.subarray(0, r.segmentCount * SEG_STRIDE), so); so += r.segmentCount * SEG_STRIDE;
+    ground.set(r.ground.subarray(0, r.groundCount * GND_STRIDE), go); go += r.groundCount * GND_STRIDE;
+  }
+  const profiles = showers.map((r) => r.profile);
   const bins = Math.max(...profiles.map((p) => p.bins));
+  const sum = (pick: (p: ShowerResult['profile']) => Float64Array): Float64Array => {
+    const a = new Float64Array(bins);
+    for (const p of profiles) pick(p).forEach((v, i) => { a[i]! += v; });
+    return a;
+  };
   const profile = {
     step: profiles[0]!.step, bins,
-    byClass: Array.from({ length: RCLASS_COUNT }, (_, c) => { const a = new Float64Array(bins); for (const p of profiles) p.byClass[c]!.forEach((v, i) => { a[i]! += v; }); return a; }),
-    charged: (() => { const a = new Float64Array(bins); for (const p of profiles) p.charged.forEach((v, i) => { a[i]! += v; }); return a; })(),
+    byClass: Array.from({ length: RCLASS_COUNT }, (_, c) => sum((p) => p.byClass[c]!)),
+    charged: sum((p) => p.charged),
   };
-  const b = best!;
+  const b = showers[bi]!;
   // The brightest shower's arrays were shifted onto the common clock; shift its stats too.
-  b.stats = { ...b.stats, tMin: b.stats.tMin + bestShift, tMax: b.stats.tMax + bestShift, tCore: b.stats.tCore + bestShift };
+  b.stats = { ...b.stats, tMin: b.stats.tMin + shifts[bi]!, tMax: b.stats.tMax + shifts[bi]!, tCore: b.stats.tCore + shifts[bi]! };
+  const first = plan.arrivals[0]!, last = plan.arrivals[plan.arrivals.length - 1]!;
   const result: ShowerResult = {
     params: { ...b.params },
     segments, segmentCount: segTotal, ground, groundCount: gndTotal, profile,
-    // The clock window: from shortly before the first core lands to shortly after the last,
-    // so a few slow hadrons do not stretch the replay.
-    stats: { ...b.stats, tMin: Math.max(tMin, firstCore - 60_000), tMax: Math.min(tMax, tArrive + 25_000), particlesTracked: tracked, truncated: true },
+    // From shortly before the first core lands to shortly after the last, so a few slow hadrons
+    // do not stretch the replay.
+    stats: { ...b.stats, tMin: Math.max(tMin, first - 60_000), tMax: Math.min(tMax, last + 25_000), particlesTracked: tracked, truncated: true },
   };
+  const energies = plan.params.map((p) => p.energyEV);
   return {
     result,
     brightest: b,
-    info: { showers: o.showers, realSpanSeconds: tArrive * 1e-9, ratePerSecond: rate, energiesEV: energies, primaries: prims, brightest: energies.indexOf(bestE) },
+    info: {
+      showers: showers.length, realSpanSeconds: last * 1e-9, ratePerSecond: plan.ratePerSecond,
+      energiesEV: energies, primaries: plan.params.map((p) => p.primary), brightest: bi,
+    },
   };
+}
+
+/** Sequential sky (tests, Node): plan, simulate each shower, merge. */
+export function simulateSky(o: SkyOptions, onProgress?: (f: number, tracked: number) => void): { result: ShowerResult; info: SkyInfo; brightest: ShowerResult } {
+  const plan = planSky(o);
+  let tracked = 0;
+  const showers = plan.params.map((p, k) => {
+    const r = simulateShower(p);
+    tracked += r.stats.particlesTracked;
+    onProgress?.((k + 1) / plan.params.length, tracked);
+    return r;
+  });
+  return mergeSky(plan, showers);
 }

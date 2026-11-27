@@ -138,7 +138,7 @@ async function runSky(): Promise<void> {
   controls.setBusy(0, 'Filling the sky...');
   try {
     const opts = { ...DEFAULT_SKY, seed: skySeed++, maxSegments: SEGMENTS[quality], showers: quality === 'low' ? 20 : DEFAULT_SKY.showers };
-    const { result: r, brightest, info } = await sim.sky(opts, (f, n) => {
+    const { result: r, brightest, info } = await sim.skyParallel(opts, (f, n) => {
       controls.setBusy(f, `Sky: ${Math.round(f * opts.showers)} of ${opts.showers} showers - ${n.toLocaleString()} particles`);
     });
     controls.setBusy(null);
