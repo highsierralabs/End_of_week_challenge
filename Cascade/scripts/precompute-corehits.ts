@@ -18,7 +18,7 @@ const THRESH_PER_CM2 = [0.1, 1, 3];
 const RB = Array.from({ length: 41 }, (_, i) => 0.1 * Math.pow(10, i / 10)); // 0.1 m .. 1 km
 
 /**
- * All-particle differential flux, m^-2 s^-1 sr^-1 GeV^-1: E^2.6 J ~ 4000 GeV^1.6 below a knee at
+ * All-particle differential flux, m^-2 s^-1 sr^-1 GeV^-1: E^2.6 J ~ 4000 GeV^1.6 at a knee of
  * 4 PeV with slope -2.7, then -3.1 (round numbers from the PDG cosmic-ray review's all-particle plot;
  * normalisation uncertain by a factor of about 2).
  */

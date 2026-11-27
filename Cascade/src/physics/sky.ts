@@ -40,7 +40,7 @@ export interface SkyInfo {
   brightest: number;
 }
 
-/** All-particle integral flux above E (eV), m^-2 s^-1 sr^-1: E^2.6 J = 4000 GeV^1.6 below a 4 PeV knee. */
+/** All-particle integral flux above E (eV), m^-2 s^-1 sr^-1: E^2.6 J = 4000 GeV^1.6 at a 4 PeV knee (slope -2.7 below, -3.1 above). */
 function integralFlux(eEV: number): number {
   const E = eEV * 1e-9;
   const knee = 4e6;

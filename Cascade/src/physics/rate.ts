@@ -121,6 +121,44 @@ export function crystalAcceptanceTable(edge: number, minChord: number, nT = 20, 
   return t;
 }
 
+// ---------------------------------------------------------------- shared detector model
+
+const TABLE_T = 20;
+const TABLE_P = 12;
+const tableCache = new Map<string, Float64Array>();
+
+/** Memoised acceptance table for a cube of the given edge and minimum chord. */
+export function acceptanceTable(edge: number, minChord: number): Float64Array {
+  const key = `/`;
+  let t = tableCache.get(key);
+  if (!t) { t = crystalAcceptanceTable(edge, minChord, TABLE_T, TABLE_P); tableCache.set(key, t); }
+  return t;
+}
+
+/**
+ * Crystal crossings per unit horizontal-plane flux for one direction of travel, cm^2:
+ * effective area (projected area x long-chord fraction) divided by cos(theta).
+ */
+export function crossingArea(table: Float64Array, dx: number, dy: number, dz: number): number {
+  const cosT = -dz;
+  if (cosT <= 0.02) return 0;
+  const ti = Math.min(TABLE_T - 1, Math.floor(cosT * TABLE_T));
+  const phi = Math.min(Math.PI / 2, Math.atan2(Math.abs(dy), Math.abs(dx)));
+  const pj = Math.min(TABLE_P - 1, Math.floor((phi / (Math.PI / 2)) * TABLE_P));
+  return table[ti * TABLE_P + pj]! / cosT;
+}
+
+/**
+ * Lead crossed on the way to a crystal at the centre of a cube-shaped cavity: through
+ * the lid when the direction's horizontal run stays inside the cavity over its height
+ * (max(|dx|,|dy|) <= cos(theta)), otherwise through the wall it meets. cm.
+ */
+export function leadPathCm(dx: number, dy: number, dz: number, lidCm: number, wallCm: number): number {
+  const cosT = Math.max(-dz, 1e-3);
+  const horiz = Math.max(Math.abs(dx), Math.abs(dy));
+  return horiz <= cosT ? lidCm / cosT : wallCm / Math.max(horiz, 1e-3);
+}
+
 function cross(a: readonly number[], b: readonly number[]): [number, number, number] {
   return [a[1]! * b[2]! - a[2]! * b[1]!, a[2]! * b[0]! - a[0]! * b[2]!, a[0]! * b[1]! - a[1]! * b[0]!];
 }
@@ -147,10 +185,10 @@ export function simulateRate(o: RateOptions, onProgress?: (f: number) => void): 
   const depths = [X0 - o.dX, X0, X0 + o.dX];
   const alts = depths.map((x) => altitudeAtDepth(x));
   const ground = alts[2]! - 5;
-  const nT = 20, nP = 12;
+
   const minChord = o.thresholdMeV / o.csiDedxMeVPerCm;
-  const acc = crystalAcceptanceTable(o.crystalCm, minChord, nT, nP);
-  const bare = crystalAcceptanceTable(o.crystalCm, 1e-6, nT, nP);
+  const acc = acceptanceTable(o.crystalCm, minChord);
+  const bare = acceptanceTable(o.crystalCm, 1e-6);
   // Primary normalisation: flux through a horizontal plane = pi sin^2(thmax) * integral I dE.
   const g1 = o.gamma - 1;
   const intI = (o.norm / g1) * (Math.pow(o.eMinGeV, -g1) - Math.pow(o.eMaxGeV, -g1));
@@ -176,17 +214,11 @@ export function simulateRate(o: RateOptions, onProgress?: (f: number) => void): 
         a.flux1 += wf;
         if (cosT > 0.95) a.vert += wf / (2 * Math.PI * 0.05 * cosT);
       }
-      const ti = Math.min(nT - 1, Math.floor(cosT * nT));
-      let phi = Math.atan2(Math.abs(dy), Math.abs(dx));
-      if (phi > Math.PI / 2) phi = Math.PI / 2;
-      const pj = Math.min(nP - 1, Math.floor((phi / (Math.PI / 2)) * nP));
       // Flux per horizontal area -> particles through the crystal: area_eff / cos(theta).
-      a.bare += (wf * bare[ti * nP + pj]!) / cosT;
-      // Lead path: through the lid, or through whichever wall the direction meets.
-      const horiz = Math.max(Math.abs(dx), Math.abs(dy));
-      const lead = Math.min(o.lidCm / cosT, horiz > 1e-6 ? o.wallCm / horiz : Infinity);
+      a.bare += wf * crossingArea(bare, dx, dy, dz);
+      const lead = leadPathCm(dx, dy, dz, o.lidCm, o.wallCm);
       if (E - M_MU > lead * o.leadLossGeVPerCm) {
-        const c = (wf * acc[ti * nP + pj]!) / cosT;
+        const c = wf * crossingArea(acc, dx, dy, dz);
         a.shield += c;
         a.shield2 += c * c;
         perShower[i]![current]! += c;

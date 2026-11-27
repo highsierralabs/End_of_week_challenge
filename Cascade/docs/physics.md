@@ -88,6 +88,14 @@ decays at rest.
 
 ## 6 Thinning
 
+The "keep one secondary" branch below the threshold is chosen before the draw. It is taken only when even the
+softest secondary's new weight, `w * sum(E) / E_min`, stays within the limit. A lone secondary keeps its parent's
+weight. Before this fix (found by review on 2026-11-26), the branch was decided after the draw. Hard secondaries
+were then over-weighted and soft ones under-weighted, and ground photons came out about 20 % low in thinned EM
+showers. Charged particles and muons were not measurably affected. After the fix, a 1 TeV gamma shower thinned at
+1e-3 gives 347 +- 12 ground photons, against 357 +- 19 unthinned.
+
+
 Hillas thinning at `E_thin = epsilon * E0`, with weight limits. The electromagnetic limit
 is 100 times `epsilon * E0 / GeV`, and hadrons and muons get a limit 100 times smaller so
 the muon component stays well sampled. The factor of 100 above CORSIKA's usual
@@ -119,7 +127,7 @@ from the core are noisy.
     660 vs 664 at 100 PeV (6 showers each).
 - **Sky mode** (`sky.ts`). Showers above 20 TeV land in an 18 km x 18 km square.
   - **Arrival times.** A Poisson process at the all-particle flux: `E^2.6 J = 4000 GeV^1.6 m^-2 s^-1 sr^-1`
-    below a 4 PeV knee, zenith below 60 degrees, about 4 x 10^5 showers per second into the square.
+    at a 4 PeV knee (slope -2.7 below it, so about 6800 at 20 TeV), zenith below 60 degrees, about 4 x 10^5 showers per second into the square.
   - **Showers.** Energies are drawn from `E^-2.7`. The mix is 45 % protons, 30 % helium, 15 % nitrogen and 10 % iron.
   - **Replay.** Each shower is simulated and placed on a common clock, so one replay shows about 100 microseconds of
     real sky.
@@ -129,7 +137,9 @@ from the core are noisy.
 The steady flux of muons at the site, and what a 1 cm^3 crystal in a lead castle counts
 from it.
 
-- **Primaries.** The PDG nucleon intensity `I(E) = 1.8e4 E^-2.7` m^-2 s^-1 sr^-1 GeV^-1,
+- **Primaries.** Zenith angles are sampled up to 85 degrees with the flat-Earth geometry of section 1. The
+  70-85 degree band, where curvature starts to matter, carries about 1.4 % of the horizontal flux, which is negligible.
+  The intensity is the PDG nucleon spectrum `I(E) = 1.8e4 E^-2.7` m^-2 s^-1 sr^-1 GeV^-1,
   with energy per nucleon from 4.5 GeV (a stand-in for the roughly 4-5 GV geomagnetic
   cutoff at 39 N) to 200 TeV. Directions are isotropic, weighted by cos(theta) for flux
   through a horizontal plane, up to 85 degrees.

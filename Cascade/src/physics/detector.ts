@@ -1,7 +1,9 @@
 // What one simulated shower delivers to the detector at the origin: particle
-// densities at the detector's core distance and the expected number of
-// particles crossing a 1 cm^3 crystal, bare and behind the lead castle.
+// densities at the detector's core distance and the expected number of particles
+// crossing the 1 cm^3 crystal, bare and behind the lead castle. Uses the same
+// crystal acceptance and lead model as rate mode (rate.ts).
 import { M_MU } from './constants';
+import { DEFAULT_RATE, acceptanceTable, crossingArea, leadPathCm } from './rate';
 import { GND, GND_STRIDE, RClass, RCLASS_COUNT, type ShowerResult } from './types';
 
 export interface DetectorExposure {
@@ -12,37 +14,34 @@ export interface DetectorExposure {
   rHi: number;
   /** Ground densities per class at the detector distance, m^-2 (weighted). */
   density: number[];
-  /** Weighted records in the annulus (statistical quality). */
+  /** Ground records in the annulus (statistical quality). */
   records: number;
-  /** Expected particles through a bare 1 cm^3 cube (charged + photons crossing), all classes. */
+  /** Expected charged particles (e+-, mu, hadrons) crossing a bare 1 cm^3 crystal, any chord. */
   bareCharged: number;
-  /** Expected muons through the crystal that clear the lead (30-40 mm) and cross >= 0.5 cm of CsI. */
+  /** Expected muons that clear the lead and cross enough CsI to pass the 2.78 MeV threshold. */
   shieldedMuons: number;
 }
 
-/** Mean effective area of a 1 cm cube for near-vertical arrivals (projected area x long-chord fraction), cm^2. */
-const CUBE_AREA_CM2 = 1.3;
-const CHORD_FRACTION = 0.62;
-const LEAD_THRESHOLD_GEV = 0.055;
-
 export function detectorExposure(r: ShowerResult): DetectorExposure {
+  const o = DEFAULT_RATE;
+  const accShield = acceptanceTable(o.crystalCm, o.thresholdMeV / o.csiDedxMeVPerCm);
+  const accBare = acceptanceTable(o.crystalCm, 1e-6);
   const [ax, ay, az] = r.stats.axis;
-  const cosT = -az;
+  const cosAxis = -az;
   const shower = (x: number, y: number): number => {
-    // Distance from the axis line through the core, in 3D, for a ground point.
+    // Distance of a ground point from the axis line through the core (both on the ground plane).
     const dx = x - r.params.coreX, dy = y - r.params.coreY;
     const along = dx * ax + dy * ay;
     return Math.sqrt(Math.max(0, dx * dx + dy * dy - along * along));
   };
   const rd = shower(0, 0);
+  const g = r.ground;
   // Annulus around the detector distance; widen until it holds enough records.
   let lo = rd * 0.8, hi = rd * 1.25 + 5;
-  const g = r.ground;
   const count = (a: number, b: number): number => {
     let n = 0;
     for (let i = 0; i < r.groundCount; i++) {
-      const o = i * GND_STRIDE;
-      const s = shower(g[o + GND.X]!, g[o + GND.Y]!);
+      const s = shower(g[i * GND_STRIDE + GND.X]!, g[i * GND_STRIDE + GND.Y]!);
       if (s >= a && s < b) n++;
     }
     return n;
@@ -50,33 +49,34 @@ export function detectorExposure(r: ShowerResult): DetectorExposure {
   for (let k = 0; k < 6 && count(lo, hi) < 40; k++) { lo *= 0.75; hi = hi * 1.35 + 5; }
   const density = new Array<number>(RCLASS_COUNT).fill(0);
   let records = 0;
-  let muonsPass = 0;
+  let bare = 0;
+  let shielded = 0;
   for (let i = 0; i < r.groundCount; i++) {
-    const o = i * GND_STRIDE;
-    const s = shower(g[o + GND.X]!, g[o + GND.Y]!);
+    const p = i * GND_STRIDE;
+    const s = shower(g[p + GND.X]!, g[p + GND.Y]!);
     if (s < lo || s >= hi) continue;
     records++;
-    const c = g[o + GND.CLASS]!;
-    const w = g[o + GND.W]!;
+    const c = g[p + GND.CLASS]!;
+    const w = g[p + GND.W]!;
     density[c]! += w;
+    if (c === RClass.GAMMA) continue;
+    const dx = g[p + GND.DX]!, dy = g[p + GND.DY]!, dz = g[p + GND.DZ]!;
+    bare += w * crossingArea(accBare, dx, dy, dz);
     if (c === RClass.MUON) {
-      const E = 10 ** g[o + GND.LOGE]!;
-      const dz = Math.abs(g[o + GND.DZ]!);
-      const lead = Math.min(4 / Math.max(dz, 0.05), 3 / Math.max(Math.sqrt(1 - dz * dz), 0.05));
-      if (E - M_MU > LEAD_THRESHOLD_GEV * (lead / 4)) muonsPass += w;
+      const E = 10 ** g[p + GND.LOGE]!;
+      if (E - M_MU > leadPathCm(dx, dy, dz, o.lidCm, o.wallCm) * o.leadLossGeVPerCm) shielded += w * crossingArea(accShield, dx, dy, dz);
     }
   }
-  // Shower-plane annulus area projected onto the ground.
-  const area = (Math.PI * (hi * hi - lo * lo)) / Math.max(cosT, 0.2);
+  // Shower-plane annulus area projected onto the ground, m^2; crossing areas are cm^2.
+  const area = (Math.PI * (hi * hi - lo * lo)) / Math.max(cosAxis, 0.2);
   for (let c = 0; c < RCLASS_COUNT; c++) density[c]! /= area;
-  const charged = density[RClass.ELECTRON]! + density[RClass.POSITRON]! + density[RClass.MUON]! + density[RClass.HADRON]!;
   return {
     coreDistance: rd,
     rLo: lo,
     rHi: hi,
     density,
     records,
-    bareCharged: charged * CUBE_AREA_CM2 * 1e-4,
-    shieldedMuons: (muonsPass / area) * CUBE_AREA_CM2 * CHORD_FRACTION * 1e-4,
+    bareCharged: (bare * 1e-4) / area,
+    shieldedMuons: (shielded * 1e-4) / area,
   };
 }

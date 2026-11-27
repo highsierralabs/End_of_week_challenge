@@ -422,19 +422,22 @@ class Cascade {
     out.length = es.length;
     if (this.eThin <= 0) { out.fill(w); return; }
     const wmax = hadronic ? this.wMaxHad : this.wMaxEm;
+    // A lone secondary keeps its parent's weight (as in CORSIKA): unbiased, less variance.
+    if (es.length === 1) { out[0] = w; return; }
     let sum = 0;
-    for (const e of es) sum += e;
-    if (ep < this.eThin && es.length > 1) {
+    let minE = Infinity;
+    for (const e of es) { sum += e; if (e < minE) minE = e; }
+    // Decide the keep-one branch BEFORE drawing, by a test that does not depend on the pick
+    // (the largest possible new weight is w * sum / minE). Deciding after the draw made the
+    // expected weights depend on energy: hard secondaries over-, soft ones under-weighted.
+    if (ep < this.eThin && (w * sum) / minE <= wmax) {
       // All below threshold: keep exactly one, chosen with probability E_i / sum.
       let u = this.rng.uniform() * sum;
       let pick = es.length - 1;
       for (let i = 0; i < es.length; i++) { u -= es[i]!; if (u <= 0) { pick = i; break; } }
-      const wn = (w * sum) / es[pick]!;
-      if (wn <= wmax) {
-        out.fill(0);
-        out[pick] = wn;
-        return;
-      }
+      out.fill(0);
+      out[pick] = (w * sum) / es[pick]!;
+      return;
     }
     for (let i = 0; i < es.length; i++) {
       const e = es[i]!;
@@ -500,6 +503,8 @@ class Cascade {
       const rho = density(c.z) * 100; // g/cm^2 per metre
       L = dX / Math.max(rho, 1e-12);
       if (L > 400000) { this.escaped = true; L = 400000; }
+      // Nearly horizontal but still descending: do not pass below the ground.
+      if (c.dz < 0 && c.z + c.dz * L <= this.zg) { L = (c.z - this.zg) / -c.dz; this.hit = true; }
     }
     if (L < 0) L = 0;
     c.x += c.dx * L; c.y += c.dy * L; c.z += c.dz * L;
