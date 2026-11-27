@@ -79,7 +79,13 @@ make it a muon counter: the instrument defines the category. Cascade's rate mode
 | Rate | 0.0698 counts/s | 0.025 counts/s |
 | Barometric coefficient | -0.36 %/hPa | -0.19 %/hPa |
 
-Both comparisons point to a substantial non-muon component in the channel. The Data panel works through the
+Both comparisons point to a substantial non-muon component in the channel.
+
+A second estimate asks how often a shower core lands close enough to put several particles through a 1 cm² crystal
+at once. Folding simulated near-core densities from 10¹⁴ to 10¹⁸ eV with the cosmic-ray flux gives tens of times a
+year at most. The classifier's EAS categories fire about 2 times a day. Whatever those count-rate patterns are, they
+are not mostly multi-particle shower cores, which is consistent with the observatory's own rule that the classifier
+labels categories, not physics. The Data panel works through the
 estimates, why they differ, and what measurement would settle it. The aggregate snapshot and its provenance are
 described in [docs/rhaco_snapshot.md](docs/rhaco_snapshot.md).
 

@@ -9,6 +9,7 @@
 import snapshot from '../data/rhaco_snapshot.json';
 import rateSite from '../data/rate_site.json';
 import rateSea from '../data/rate_sea.json';
+import corehits from '../data/corehits.json';
 import { h, icon, ICONS } from './dom';
 import { Axis, INK, MONO, SANS, Surface, drawAxes, drawSeries, haloText, type Rect } from './plot';
 
@@ -60,6 +61,8 @@ export function compare(): Comparison {
 }
 
 const f = (v: number, d = 3): string => v.toFixed(d);
+/** Round to one significant figure, for order-of-magnitude statements. */
+const round1 = (v: number): string => { const p = 10 ** Math.floor(Math.log10(Math.abs(v) || 1)); return String(Math.round(v / p) * p); };
 
 /** Plain-language comparison of the two estimates of the non-muon share. */
 function verdict(c: Comparison): string {
@@ -123,6 +126,27 @@ export function createObservatory(el: HTMLElement): Observatory {
   and this split is an interpretation layered on top of it. Ways to test it include a coincidence measurement against
   a second detector, extra polyethylene or borated shielding around the castle, and the spectrum shape above 2.78 MeV.</p>`;
 
+  const easDay = (snapshot.event_class_totals.EAS.per_live_day + snapshot.event_class_totals['SUPER-EAS'].per_live_day);
+  const ch = corehits as { ratePerDay: number[]; ratePerYear: number[]; thresholdsPerCm2: number[] };
+  const cores = `
+  <h3>Could the EAS categories be shower cores? <span class="cx-obs-tag">simulation estimate</span></h3>
+  <p>A crystal with about 1.3 cm&sup2; of effective area catches two or more particles from one shower only where the
+  shower's local density is around one charged particle per cm&sup2; (10<sup>4</sup> per m&sup2;). That happens only within a few metres of the
+  core of a shower above about 10<sup>16.5</sup> eV. Cascade estimates how often such a core lands on a given point:
+  it simulates proton showers from 10<sup>14</sup> to 10<sup>18</sup> eV, measures their ground density against core
+  distance, and folds the area above each threshold with the all-particle cosmic-ray flux.</p>
+  <ul>
+    <li>&ge; 1 charged particle per cm&sup2; (two or so through the crystal): about <b>${ch.ratePerYear[1]!.toFixed(0)} per year</b> (${ch.ratePerDay[1]!.toFixed(2)} per day).</li>
+    <li>&ge; 3 per cm&sup2; (about four through the crystal): about <b>${ch.ratePerYear[2]!.toFixed(1)} per year</b>.</li>
+    <li>The classifier's EAS and SUPER-EAS categories together: <b>${easDay.toFixed(1)} per live day</b>.</li>
+  </ul>
+  <p>Suppose an 8&times; or larger ratio needed several particles to cross the crystal at once. Then these categories
+  would fire about ${round1(easDay / ch.ratePerDay[1]!)} to ${round1(easDay / ch.ratePerDay[2]!)} times more often than shower cores can supply. That holds for a bare crystal,
+  and the lead would lower the shower side further. The estimate is rough: proton showers only, near-core densities
+  from thinned showers, and a flux normalisation good to about a factor of two. Even a factor of a few either way leaves a gap. The reading consistent with the observatory's own rule, that measurement defines category, is that
+  the EAS label marks a count-rate pattern. Whether those patterns come from single large deposits, from how the
+  firmware turns counts into a rate, or from rare multi-particle hits is a question for the instrument, not one this
+  simulation can settle.</p>`;
   const scope = `
   <h3>Honest scope</h3>
   <ul class="cx-obs-scope">
@@ -134,7 +158,7 @@ export function createObservatory(el: HTMLElement): Observatory {
     <li>The simulation does not model: electromagnetic punch-through, neutron production or capture in lead,
       hadrons, knock-on electrons, the CsI light yield, the firmware's filtering, solar modulation or temperature effects.
       Its muon flux at the site is ${f(c.sim.fluxSite * 60, 2)} per cm&sup2; per minute through a horizontal surface (anchored).</li>
-    <li>Event classes below are the logger classifier's categories, defined by ratios of firmware-filtered count rates.
+    <li>The event categories in the charts above are the logger classifier's categories, defined by ratios of firmware-filtered count rates.
       They are not particle identifications. In particular, "EAS" below 15&times; is what is left after RADON events are taken out.</li>
     <li>Data: aggregate snapshot from the RHACO citizen observatory, generated ${prov.generated_utc.slice(0, 10)}. No per-event records are included.</li>
   </ul>`;
@@ -155,7 +179,7 @@ export function createObservatory(el: HTMLElement): Observatory {
     a 1 cm&sup3; CsI(Tl) crystal in a lead castle at 1539 m, recording since spring 2026. This page sets the simulated muon rain
     beside that instrument's own daily aggregates.</p>${cards}`);
   body.append(charts);
-  body.insertAdjacentHTML('beforeend', reading + scope);
+  body.insertAdjacentHTML('beforeend', reading + cores + scope);
 
   const dlg = h('dialog', { class: 'cx-about cx-obs', 'aria-labelledby': 'cx-obs-title' },
     h('header', { class: 'cx-about-head' },

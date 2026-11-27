@@ -137,7 +137,22 @@ from it.
   secondaries made in the lead, neutron capture gamma rays, the CsI response, solar
   modulation, and temperature effects.
 
-## 9 Validation
+## 9 Shower-core hits (`scripts/precompute-corehits.ts`)
+
+For each energy from 10^14 to 10^18 eV in half-decade steps, the script runs three 20-degree proton showers and
+measures the mean charged ground density (e+-, mu, hadrons) in log-spaced shower-plane radius bins. `r_k(E)` is
+the outermost radius where that density reaches k particles per cm^2, for k = 0.1, 1 and 3. The rate at which such
+cores land on a point is `pi sr x integral J(E) pi r_k^2 dE`. Here J is the all-particle flux with
+`E^2.6 J = 4000 GeV^1.6 m^-2 s^-1 sr^-1` below a knee at 4 PeV, a slope of -2.7 below the knee and -3.1 above it,
+and an extrapolation above 10^18 eV.
+
+The result is about 29 per year for k = 1 and about 1.5 per year for k = 3. The estimate is good to an order of
+magnitude:
+- the near-core bins are noisy because the showers are thinned;
+- proton showers only;
+- the flux normalisation is uncertain by a factor of about 2.
+
+## 10 Validation
 
 - **Unit tests** (`tests/unit/physics.test.ts`):
   - the atmosphere, its inversion, and integration of density;

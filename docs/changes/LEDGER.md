@@ -14,3 +14,4 @@
 | EOWC-CHG-20261126-010 | Validation page with precomputed 348-shower ensemble; README cites its numbers |
 | EOWC-CHG-20261126-011 | Replay sonification (S key) |
 | EOWC-FIX-20261126-012 | check-commit-msg CLI no longer runs on import (gate crash) |
+| EOWC-CHG-20261126-013 | Shower-core hit-rate estimate and the Data panel section comparing it with the EAS categories |
