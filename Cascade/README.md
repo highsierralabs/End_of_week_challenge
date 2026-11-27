@@ -27,6 +27,9 @@ the observatory's own measurements.
   - the lateral distribution against the NKG function;
   - the ground footprint;
   - arrival times relative to a plane front.
+- **Sky mode** shows a faithful slice of real time over the valley: about 100 µs of showers above 20 TeV, with
+  Poisson arrival times, energies drawn from the spectrum, and every shower simulated.
+- **Listen** (press **S**): each ground arrival clicks, pitched by species, and a hiss rises as the front comes down.
 - **Take the guided tour**: twelve steps through air-shower physics, each running its own shower.
 - **Compare with a real instrument**: the rate mode simulates the steady rain of muons at the site and predicts the
   count rate and barometric coefficient of the observatory's crystal. The Data panel puts those next to 180 days of
@@ -35,6 +38,8 @@ the observatory's own measurements.
   muon number with standard scalings and published full-simulation values.
 
 ![The app: controls, readout, charts and the replay timeline](docs/screenshots/app.png)
+
+![Sky mode: about 100 microseconds of real cosmic-ray showers over the Reno-Stead area](docs/screenshots/sky.png)
 
 ## The physics, briefly
 

@@ -150,3 +150,17 @@ describe('shower Monte Carlo', () => {
     expect(g.stats.groundCounts[RClass.MUON]! * 5).toBeLessThan(p.stats.groundCounts[RClass.MUON]!);
   });
 });
+
+describe('sky mode', () => {
+  it('merges Poisson-timed showers onto one clock at a physical rate', async () => {
+    const { simulateSky, DEFAULT_SKY } = await import('../../src/physics/sky');
+    const { result, info, brightest } = simulateSky({ ...DEFAULT_SKY, showers: 5, maxSegments: 20000, seed: 3 });
+    expect(info.showers).toBe(5);
+    // Showers above 20 TeV into an 18 km square: of order 1e5 per second (all-particle flux).
+    expect(info.ratePerSecond).toBeGreaterThan(5e4);
+    expect(info.ratePerSecond).toBeLessThan(2e6);
+    expect(result.stats.tMax).toBeGreaterThan(result.stats.tMin);
+    expect(result.segmentCount).toBeGreaterThan(brightest.segmentCount);
+    expect(Math.max(...info.energiesEV)).toBe(info.energiesEV[info.brightest]);
+  });
+});

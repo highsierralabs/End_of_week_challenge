@@ -12,7 +12,7 @@ import { altitudeAtDepth } from '../physics/atmosphere';
 import { C_M_PER_NS } from '../physics/constants';
 import type { ShowerResult } from '../physics/types';
 
-export type CameraPreset = 'overview' | 'follow' | 'side' | 'ground' | 'detector';
+export type CameraPreset = 'overview' | 'follow' | 'side' | 'ground' | 'detector' | 'sky';
 export type Quality = 'low' | 'medium' | 'high';
 
 export interface StageOptions {
@@ -170,6 +170,10 @@ export class Stage {
         case 'ground':
           target = this.axisPoint(r.params.groundAltitudeM + 900);
           pos = core.clone().addScaledVector(side, 700).addScaledVector(axR, 350).add(new THREE.Vector3(0, 35, 0));
+          break;
+        case 'sky':
+          target = new THREE.Vector3(0, 2500, 0);
+          pos = new THREE.Vector3(-14000, 7000, 21000);
           break;
         case 'detector':
           target = new THREE.Vector3(0, 0.85, 0);

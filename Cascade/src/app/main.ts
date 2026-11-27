@@ -5,6 +5,7 @@ import {
   CLASS_HEX, autoThinning, isPhoneLayout, type Quality, type TourStep,
 } from '../ui';
 import { DEFAULT_PARAMS } from '../physics/cascade';
+import { DEFAULT_SKY } from '../physics/sky';
 import type { ShowerParams, ShowerResult } from '../physics/types';
 import { SimClient } from '../sim/client';
 import { Stage, type CameraPreset } from '../render/stage';
@@ -66,6 +67,7 @@ const controls = createControls(layout.controls, initial, {
   onTour: () => tour.open(),
   onAbout: () => about.open(),
   onObservatory: () => observatory.open(),
+  onSky: () => void runSky(),
   onQuality: (qq) => { quality = qq; stage?.setQuality(qq); layout.toast(`Quality: ${qq} (applies to the next shower)`); },
 }, { quality, camera: 'overview' });
 
@@ -119,8 +121,8 @@ async function run(p: ShowerParams, camera?: string, play = true): Promise<void>
     const span = r.stats.tMax - r.stats.tMin;
     nsPerSecond = Math.max(200, Math.min(100000, span / 25));
     const preset = (camera ?? (userCamera ? stage?.getPreset() : 'overview')) as CameraPreset;
-    controls.setCameraPreset(preset);
-    stage?.setPreset(preset);
+    controls.setCameraPreset(preset === 'sky' ? null : preset);
+    stage?.setPreset(preset === 'sky' ? 'overview' : preset);
     pushTime();
     const secs = ((performance.now() - started) / 1000).toFixed(1);
     layout.toast(`${r.stats.particlesTracked.toLocaleString()} particles tracked in ${secs} s`);
@@ -128,6 +130,40 @@ async function run(p: ShowerParams, camera?: string, play = true): Promise<void>
     controls.setBusy(null);
     if (e instanceof Error && e.message === 'cancelled') return;
     layout.toast(`Simulation failed: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+let skySeed = 1;
+async function runSky(): Promise<void> {
+  controls.setBusy(0, 'Filling the sky...');
+  try {
+    const opts = { ...DEFAULT_SKY, seed: skySeed++, maxSegments: SEGMENTS[quality], showers: quality === 'low' ? 20 : DEFAULT_SKY.showers };
+    const { result: r, brightest, info } = await sim.sky(opts, (f, n) => {
+      controls.setBusy(f, `Sky: ${Math.round(f * opts.showers)} of ${opts.showers} showers - ${n.toLocaleString()} particles`);
+    });
+    controls.setBusy(null);
+    result = r;
+    stage?.load(r);
+    sound.load(r);
+    charts.update(brightest);
+    renderStats(layout.stats, brightest);
+    const body = layout.stats.querySelector('.cx-panel-body') ?? layout.stats;
+    body.querySelector('.cx-det')?.remove();
+    const note = document.createElement('div');
+    note.className = 'cx-det';
+    const eMax = Math.max(...info.energiesEV);
+    note.innerHTML = `<span class="cx-det-k">Sky mode</span><span>${info.showers} showers above ${(opts.eMinEV / 1e12).toFixed(0)} TeV landing in an ${(2 * opts.halfWidthM / 1000).toFixed(0)} km square during <b>${(info.realSpanSeconds * 1e6).toFixed(0)} &micro;s</b> of real time (about ${(info.ratePerSecond / 1000).toFixed(0)} thousand per second). Energies follow the spectrum; the readout and charts show the largest, ${(eMax / 1e12).toFixed(0)} TeV ${info.primaries[info.brightest]}.</span>`;
+    body.append(note);
+    tNs = r.stats.tMin;
+    playing = true;
+    nsPerSecond = Math.max(200, Math.min(100000, (r.stats.tMax - r.stats.tMin) / 30));
+    stage?.setPreset('sky');
+    controls.setCameraPreset(null);
+    pushTime();
+  } catch (e) {
+    controls.setBusy(null);
+    if (e instanceof Error && e.message === 'cancelled') return;
+    layout.toast(`Sky failed: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 
@@ -178,4 +214,5 @@ void run(controls.getParams());
   get stage() { return stage; },
   seek: (t: number) => { tNs = t; playing = false; pushTime(); },
   run: (p: Partial<ShowerParams>) => run({ ...controls.getParams(), ...p }),
+  sky: () => runSky(),
 };

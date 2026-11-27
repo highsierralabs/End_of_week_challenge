@@ -2,6 +2,7 @@
 // renderer / UI. Units everywhere: metres, nanoseconds, GeV, g/cm^2.
 // Frame: x = east, y = north, z = up, z measured as altitude above sea level.
 // The detector sits at (0, 0, groundAltitudeM).
+import type { SkyInfo, SkyOptions } from './sky';
 
 /** Particle species tracked by the Monte Carlo. */
 export const PType = {
@@ -157,9 +158,11 @@ export interface ShowerResult {
 
 /** Messages to and from the simulation worker. */
 export type WorkerRequest =
-  | { kind: 'run'; id: number; params: ShowerParams };
+  | { kind: 'run'; id: number; params: ShowerParams }
+  | { kind: 'sky'; id: number; options: SkyOptions };
 
 export type WorkerResponse =
   | { kind: 'progress'; id: number; fraction: number; tracked: number }
   | { kind: 'done'; id: number; result: ShowerResult }
+  | { kind: 'sky-done'; id: number; result: ShowerResult; brightest: ShowerResult; info: SkyInfo }
   | { kind: 'error'; id: number; message: string };

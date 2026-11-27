@@ -18,6 +18,8 @@ export interface ControlHandlers {
   onAbout(): void;
   /** Open the observatory comparison (optional). */
   onObservatory?(): void;
+  /** Run sky mode (optional). */
+  onSky?(): void;
   onQuality(q: Quality): void;
 }
 
@@ -105,8 +107,11 @@ export function createControls(el: HTMLElement, initial: ShowerParams, hd: Contr
   const obsBtn = h('button', { type: 'button', class: 'cx-btn cx-btn--ghost cx-btn--obs', title: 'RHACO observatory data next to the simulation' });
   obsBtn.append(h('span', { class: 'cx-obs-dot' }), h('span', { text: 'Data' }));
   obsBtn.addEventListener('click', () => hd.onObservatory?.());
-  const actions = slot ? null : h('div', { class: 'cx-actions' }, obsBtn, tourBtn, aboutBtn);
-  if (slot) slot.append(obsBtn, tourBtn, aboutBtn);
+  const skyBtn = h('button', { type: 'button', class: 'cx-btn cx-btn--ghost', title: 'Sky mode: 100 microseconds of real cosmic-ray sky over the valley' });
+  skyBtn.append(h('span', { text: 'Sky' }));
+  skyBtn.addEventListener('click', () => hd.onSky?.());
+  const actions = slot ? null : h('div', { class: 'cx-actions' }, skyBtn, obsBtn, tourBtn, aboutBtn);
+  if (slot) slot.append(skyBtn, obsBtn, tourBtn, aboutBtn);
 
   // ---- primary
   const primaryGroup = h('div', { class: 'cx-seg cx-seg--primary', role: 'radiogroup', 'aria-label': 'Primary particle' });
