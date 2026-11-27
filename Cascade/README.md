@@ -8,9 +8,10 @@ Live: **https://highsierralabs.github.io/End_of_week_challenge/** · Validation:
 
 Cascade follows a primary cosmic ray (a proton, a helium, nitrogen or iron nucleus, or a gamma ray, from 1 TeV to
 10 EeV) from its first collision 15-25 km up, through the hadronic core, the decays of pions into photons and muons,
-and the electromagnetic cascade, down to the ground at 1539 m. Hundreds of thousands of particles are tracked in a Web
-Worker in a few seconds. The shower is then replayed at a slow-motion factor you choose: the front sweeps down at
-the speed of light, the muons arrive first, and the ground lights up where particles land.
+and the electromagnetic cascade, down to the ground at 1539 m. Hundreds of thousands of particles are tracked in Web
+Workers in a few seconds; big showers are split across all CPU cores. The shower is then replayed at a slow-motion
+factor you choose. The front sweeps down at the speed of light, the muons lead at every distance from the core, and the
+ground lights up where particles land.
 
 The site is modelled on a real place. The ground is 60 km of real terrain around Stead, north of Reno (USGS 3DEP,
 via the AWS Terrain Tiles). The detector is drawn to scale: a 1 cm³ CsI(Tl) crystal in a lead castle like the one the
@@ -68,8 +69,9 @@ places:
 - proton and iron Xmax sit inside the reference band at 3 of 5 energies each, and above it elsewhere (by up to
   24 g/cm² for protons and 9 for iron);
 - the elongation rates are about 5-8 g/cm² per decade low;
-- the Xmax spread drifts away from the full simulations at some energies. The
-[validation page](validation.html) scores every one of these.
+- the Xmax spread drifts away from the full simulations at some energies.
+
+The [validation page](validation.html) scores every one of these.
 
 ## Cascade and the RHACO observatory
 
@@ -95,8 +97,8 @@ a year. The classifier's EAS categories fire about 2 times a day. Whatever those
 are not mostly multi-particle shower cores, which is consistent with the observatory's own rule that the classifier
 labels categories, not physics.
 
-The Data panel works through the estimates, why they differ, and what measurement would settle it. The aggregate snapshot and its provenance are
-described in [docs/rhaco_snapshot.md](docs/rhaco_snapshot.md), and the findings are collected for the observatory in
+The Data panel works through the estimates, why they differ, and what measurement would settle it. The aggregate
+snapshot and its provenance are described in [docs/rhaco_snapshot.md](docs/rhaco_snapshot.md), and the findings are collected for the observatory in
 [docs/rhaco_findings.md](docs/rhaco_findings.md).
 
 ## Run it locally
@@ -109,6 +111,7 @@ npm ci
 npm run dev          # http://127.0.0.1:5190
 npm run check        # typecheck + lint + physics unit tests
 npm run build        # static site in dist/
+npm run smoke        # boot the built site in GPU Chromium on WebGPU and WebGL2
 ```
 
 Other commands:
@@ -116,6 +119,8 @@ Other commands:
 ```bash
 npx vite-node scripts/precompute-rate.ts -- site 240000 2026   # regenerate the rate-mode data
 npx vite-node scripts/precompute-validation.ts                 # regenerate the validation data
+npx vite-node scripts/precompute-corehits.ts -- 6              # regenerate the shower-core hit rates
+node scripts/clip.mjs --out docs/screenshots/shower.gif        # render a README clip (needs ffmpeg)
 node scripts/shot.mjs --url "/?clean" --out shots/x.png        # screenshot (needs the dev server)
 ```
 
@@ -128,13 +133,15 @@ URL options:
 | `?seed=N` | Set the random seed |
 | `?clean` | Start with the interface hidden |
 | `?data` | Open the Data panel |
+| `?welcome` | Show the first-visit card again |
 
 ## Layout
 
 | Path | What |
 |---|---|
 | `src/physics/` | The Monte Carlo: pure, deterministic TypeScript (atmosphere, cross sections, cascade, rate mode, fits). |
-| `src/sim/` | The worker and its client. |
+| `src/sim/` | The workers and their pool: single showers, split showers, sky mode. |
+| `src/audio/` | Sonification. |
 | `src/render/` | three.js WebGPU renderer, TSL shaders: track replay, terrain, sky, detector, camera rig. |
 | `src/ui/` | Panels, charts, tour, the Data panel. |
 | `src/data/` | The RHACO aggregate snapshot and the precomputed rate and validation runs. |
