@@ -29,7 +29,9 @@ export function renderStats(el: HTMLElement, r: ShowerResult): void {
     Number.isFinite(hFirst) ? `${(hFirst / 1000).toFixed(1)} km a.s.l.` : ''));
 
   const gh = st.gh;
-  cells.push(cell('Xmax · fit', gh && Number.isFinite(gh.xmax) ? `${gh.xmax.toFixed(0)} g/cm²` : 'no fit',
+  // A maximum past the ground is an extrapolation of the fit, not a measurement of the profile.
+  const beyond = gh && Number.isFinite(gh.xmax) && gh.xmax > r.stats.groundSlantDepth - 15;
+  cells.push(cell(beyond ? 'Xmax · past ground' : 'Xmax · fit', gh && Number.isFinite(gh.xmax) ? (beyond ? `> ${r.stats.groundSlantDepth.toFixed(0)} g/cm²` : `${gh.xmax.toFixed(0)} g/cm²`) : 'no fit',
     Number.isFinite(ref) ? `HM ref. ${ref.toFixed(0)}${gh ? ` (${signed(gh.xmax - ref)})` : ''}` : ''));
   cells.push(cell('Nmax', gh && Number.isFinite(gh.nmax) ? si(gh.nmax) : '—', 'charged, at Xmax'));
 

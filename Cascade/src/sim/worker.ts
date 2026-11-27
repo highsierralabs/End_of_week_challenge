@@ -1,5 +1,5 @@
 // Simulation worker: runs one shower per request and transfers the typed arrays back.
-import { simulateShower } from '../physics/cascade';
+import { continueShower, simulateShower } from '../physics/cascade';
 import { simulateSky } from '../physics/sky';
 import type { WorkerRequest, WorkerResponse } from '../physics/types';
 
@@ -19,7 +19,10 @@ self.onmessage = (ev: MessageEvent<WorkerRequest>) => {
     return;
   }
   try {
-    const result = simulateShower(req.params, (fraction, tracked) => post({ kind: 'progress', id: req.id, fraction, tracked }));
+    const progress = (fraction: number, tracked: number): void => post({ kind: 'progress', id: req.id, fraction, tracked });
+    const result = req.kind === 'part'
+      ? continueShower(req.params, req.cont, req.seeds, progress)
+      : simulateShower(req.params, progress);
     const transfer: Transferable[] = [result.segments.buffer, result.ground.buffer, result.profile.charged.buffer];
     for (const a of result.profile.byClass) transfer.push(a.buffer);
     post({ kind: 'done', id: req.id, result }, transfer);

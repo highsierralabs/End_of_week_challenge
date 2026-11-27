@@ -164,3 +164,21 @@ describe('sky mode', () => {
     expect(Math.max(...info.energiesEV)).toBe(info.energiesEV[info.brightest]);
   });
 });
+
+describe('split showers', () => {
+  it('a split shower conserves the bookkeeping of its parts and matches single runs statistically', async () => {
+    const { simulateShowerSplit, beginShower } = await import('../../src/physics/cascade');
+    const p = { ...DEFAULT_PARAMS, energyEV: 1e15, zenithDeg: 0, thinning: 1e-4, recordTracks: true, maxSegments: 90000, seed: 21 };
+    const h = beginShower(p, 8);
+    expect(h.parts.length).toBe(8);
+    expect(h.parts.flat().length).toBeGreaterThan(8);
+    const r = simulateShowerSplit(p, 8);
+    expect(r.segments.length).toBe(r.segmentCount * SEG_STRIDE);
+    expect(r.segmentCount).toBeLessThanOrEqual(90000 + 1000);
+    expect(r.stats.firstInteractionDepth).toBe(h.head.stats.firstInteractionDepth);
+    const xs = Array.from({ length: 6 }, (_, i) => simulateShowerSplit({ ...p, recordTracks: false, seed: 60 + i }, 8).stats.gh!.xmax);
+    const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+    expect(mean).toBeGreaterThan(480);
+    expect(mean).toBeLessThan(660);
+  });
+});

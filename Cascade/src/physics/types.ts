@@ -3,6 +3,7 @@
 // Frame: x = east, y = north, z = up, z measured as altitude above sea level.
 // The detector sits at (0, 0, groundAltitudeM).
 import type { SkyInfo, SkyOptions } from './sky';
+import type { Continuation, SeedParticle } from './cascade';
 
 /** Particle species tracked by the Monte Carlo. */
 export const PType = {
@@ -159,7 +160,8 @@ export interface ShowerResult {
 /** Messages to and from the simulation worker. */
 export type WorkerRequest =
   | { kind: 'run'; id: number; params: ShowerParams }
-  | { kind: 'sky'; id: number; options: SkyOptions };
+  | { kind: 'sky'; id: number; options: SkyOptions }
+  | { kind: 'part'; id: number; params: ShowerParams; cont: Continuation; seeds: SeedParticle[] };
 
 export type WorkerResponse =
   | { kind: 'progress'; id: number; fraction: number; tracked: number }

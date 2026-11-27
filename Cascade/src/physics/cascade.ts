@@ -92,6 +92,101 @@ export function simulateShower(params: ShowerParams, onProgress?: ProgressFn, ho
   return new Cascade(params, hooks).run(onProgress);
 }
 
+// ---------------------------------------------------------------- split showers
+// A big shower is split after its first interactions: the stack is divided into
+// SPLIT_PARTS energy-balanced parts that run independently (in parallel workers)
+// on the head's clock, then merged. The part count is fixed, so a seed gives the
+// same shower on any machine.
+
+export const SPLIT_PARTS = 8;
+
+/** A particle handed from the head of a split shower to one of its parts (plain data). */
+export interface SeedParticle {
+  type: PType; E: number; x: number; y: number; z: number; dx: number; dy: number; dz: number;
+  t: number; w: number; A: number; tau: number; level: number;
+}
+
+/** Shared state of a split shower: its clock and first interaction. */
+export interface Continuation {
+  tFirst: number;
+  firstDepth: number;
+  start: [number, number, number];
+  tMin: number;
+}
+
+export interface ShowerHead { head: ShowerResult; cont: Continuation; parts: SeedParticle[][]; partParams: ShowerParams[] }
+
+/** Run the head of a shower and divide its stack into SPLIT_PARTS energy-balanced parts. */
+export function beginShower(params: ShowerParams, parts = SPLIT_PARTS): ShowerHead {
+  const c = new Cascade({ ...params, maxSegments: Math.max(1000, Math.floor(params.maxSegments / (parts + 1))) });
+  const { cont, seeds, head } = c.begin(parts * 12);
+  // Greedy balance by carried energy (largest first onto the lightest part).
+  seeds.sort((a, b) => b.E * b.w - a.E * a.w);
+  const load = new Array<number>(parts).fill(0);
+  const out: SeedParticle[][] = Array.from({ length: parts }, () => []);
+  for (const p of seeds) {
+    let k = 0;
+    for (let i = 1; i < parts; i++) if (load[i]! < load[k]!) k = i;
+    out[k]!.push(p);
+    load[k]! += p.E * p.w;
+  }
+  const per = Math.max(1000, Math.floor(params.maxSegments / (parts + 1)));
+  const partParams = out.map((_, i) => ({ ...params, seed: (Math.imul(params.seed ^ 0x5bd1e995, 31) + i * 2654435761 + 1) >>> 0, maxSegments: per }));
+  return { head, cont, parts: out, partParams };
+}
+
+/** Simulate one part of a split shower. */
+export function continueShower(params: ShowerParams, cont: Continuation, seeds: SeedParticle[], onProgress?: ProgressFn): ShowerResult {
+  return new Cascade(params).continueFrom(cont, seeds).run(onProgress);
+}
+
+/** Merge the head and parts of a split shower into one result. */
+export function mergeShower(params: ShowerParams, head: ShowerResult, parts: ShowerResult[]): ShowerResult {
+  const all = [head, ...parts];
+  const segN = all.reduce((n, r) => n + r.segmentCount, 0);
+  const gndN = all.reduce((n, r) => n + r.groundCount, 0);
+  const segments = new Float32Array(segN * SEG_STRIDE);
+  const ground = new Float32Array(gndN * GND_STRIDE);
+  let so = 0, go = 0;
+  for (const r of all) {
+    segments.set(r.segments.subarray(0, r.segmentCount * SEG_STRIDE), so); so += r.segmentCount * SEG_STRIDE;
+    ground.set(r.ground.subarray(0, r.groundCount * GND_STRIDE), go); go += r.groundCount * GND_STRIDE;
+  }
+  const bins = head.profile.bins;
+  const sum = (pick: (r: ShowerResult) => Float64Array): Float64Array => {
+    const a = new Float64Array(bins);
+    for (const r of all) pick(r).forEach((v, i) => { if (i < bins) a[i]! += v; });
+    return a;
+  };
+  const profile = { step: head.profile.step, bins, byClass: Array.from({ length: RCLASS_COUNT }, (_, c) => sum((r) => r.profile.byClass[c]!)), charged: sum((r) => r.profile.charged) };
+  const counts = new Array<number>(RCLASS_COUNT).fill(0);
+  for (const r of all) r.stats.groundCounts.forEach((v, i) => { counts[i]! += v; });
+  const finite = (v: number): boolean => Number.isFinite(v);
+  const tMins = all.map((r) => r.stats.tMin).filter(finite);
+  const tMaxs = all.map((r) => r.stats.tMax).filter(finite);
+  return {
+    params,
+    segments, segmentCount: segN, ground, groundCount: gndN, profile,
+    stats: {
+      ...head.stats,
+      gh: fitGaisserHillas(profile.step, profile.charged, head.stats.groundSlantDepth),
+      groundCounts: counts,
+      particlesTracked: all.reduce((n, r) => n + r.stats.particlesTracked, 0),
+      interactions: all.reduce((n, r) => n + r.stats.interactions, 0),
+      cpuMs: all.reduce((n, r) => n + r.stats.cpuMs, 0),
+      truncated: all.some((r) => r.stats.truncated),
+      tMin: tMins.length ? Math.min(...tMins) : 0,
+      tMax: tMaxs.length ? Math.max(...tMaxs) : 0,
+    },
+  };
+}
+
+/** Split shower run sequentially (tests, Node). */
+export function simulateShowerSplit(params: ShowerParams, parts = SPLIT_PARTS): ShowerResult {
+  const h = beginShower(params, parts);
+  return mergeShower(params, h.head, h.parts.map((seeds, i) => continueShower(h.partParams[i]!, h.cont, seeds)));
+}
+
 class Cascade {
   readonly p: ShowerParams;
   readonly rng: Rng;
@@ -173,6 +268,7 @@ class Cascade {
     this.wMaxEm = params.thinning > 0 ? Math.max(1, params.thinning * this.E0 * WEIGHT_FACTOR) : 1;
     this.wMaxHad = Math.max(1, this.wMaxEm / 100);
     this.importantE = Math.max(1, 1e-4 * this.E0);
+    this.progressBase = this.E0;
     const cap = params.recordTracks ? Math.max(1000, params.maxSegments) : 0;
     this.seg = new Float32Array(cap * SEG_STRIDE);
     this.segLevel = new Uint8Array(cap);
@@ -188,7 +284,7 @@ class Cascade {
 
   run(onProgress?: ProgressFn): ShowerResult {
     const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
-    this.injectPrimary();
+    if (!this.continued) this.injectPrimary();
     let nextReport = 20000;
     while (this.sp > 0) {
       this.pop();
@@ -206,7 +302,53 @@ class Cascade {
   private progress(): number {
     let e = 0;
     for (let i = 0; i < this.sp; i++) e += this.stack[i]!.E * this.stack[i]!.w;
-    return Math.min(0.999, Math.max(0, 1 - e / this.E0));
+    return Math.min(0.999, Math.max(0, 1 - e / this.progressBase));
+  }
+
+  // ------------------------------------------------------------ parallel split
+
+  private continued = false;
+  private progressBase = 0;
+
+  /** Phase A of a split shower: inject the primary and track until the stack holds 	arget particles. */
+  begin(target: number): { cont: Continuation; seeds: SeedParticle[]; head: ShowerResult } {
+    const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
+    this.injectPrimary();
+    // Highest energy first (not depth-first): the stack fans out into many
+    // medium-energy particles, so the parts can be balanced. Stop once no single
+    // particle carries more than a small share of the energy.
+    const cap = this.E0 / (target / 2);
+    for (let guard = 0; this.sp > 0 && guard < 100000; guard++) {
+      let bi = 0;
+      for (let i = 1; i < this.sp; i++) if (this.stack[i]!.E > this.stack[bi]!.E) bi = i;
+      if (this.sp >= target && this.stack[bi]!.E < cap) break;
+      const top = this.sp - 1;
+      const tmp = this.stack[top]!;
+      this.stack[top] = this.stack[bi]!;
+      this.stack[bi] = tmp;
+      this.pop();
+      this.tracked++;
+      this.track();
+    }
+    const seeds: SeedParticle[] = [];
+    for (let i = 0; i < this.sp; i++) seeds.push({ ...this.stack[i]! });
+    this.sp = 0;
+    const cont: Continuation = { tFirst: this.tFirst, firstDepth: this.firstDepth, start: this.startPoint, tMin: this.tMin };
+    const head = this.finish((typeof performance !== 'undefined' ? performance.now() : 0) - t0);
+    return { cont, seeds, head };
+  }
+
+  /** Continue a split shower from seed particles on the head's clock. */
+  continueFrom(cont: Continuation, seeds: SeedParticle[]): this {
+    this.continued = true;
+    this.primaryFirstStep = false;
+    this.firstDepth = cont.firstDepth;
+    this.tFirst = cont.tFirst;
+    this.startPoint = cont.start;
+    let e = 0;
+    for (const p of seeds) { this.pushCopy(p as Particle); e += p.E * p.w; }
+    this.progressBase = Math.max(e, 1e-9);
+    return this;
   }
 
   // ------------------------------------------------------------ setup
