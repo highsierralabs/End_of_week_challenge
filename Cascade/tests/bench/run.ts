@@ -14,12 +14,12 @@ const thin = Number(args[3] ?? 1e-5);
 const xs: number[] = [];
 const mus: number[] = [];
 for (let i = 0; i < n; i++) {
-  const r = simulateShower({ ...DEFAULT_PARAMS, primary, energyEV: 10 ** lg, zenithDeg: 0, seed: 100 + i, thinning: thin, recordTracks: i === 0 });
+  const r = simulateShower({ ...DEFAULT_PARAMS, primary, energyEV: 10 ** lg, zenithDeg: 0, seed: Number(process.env.SEED0 ?? 100) + i, thinning: thin, recordTracks: i === 0 });
   const s = r.stats;
   xs.push(s.gh?.xmax ?? NaN);
   mus.push(s.groundCounts[3]!);
   if (!quiet) console.log(
-    `seed ${100 + i}: X1=${s.firstInteractionDepth.toFixed(1)} Xmax=${s.gh?.xmax.toFixed(1)} Nmax=${s.gh?.nmax.toExponential(2)} ` +
+    `seed ${i}: X1=${s.firstInteractionDepth.toFixed(1)} Xmax=${s.gh?.xmax.toFixed(1)} Nmax=${s.gh?.nmax.toExponential(2)} ` +
       `lam=${s.gh?.lambda.toFixed(1)} gnd[g,e-,e+,mu,h]=${s.groundCounts.map((c) => c.toExponential(2)).join(',')} ` +
       `tracked=${s.particlesTracked} segs=${r.segmentCount} gnd=${r.groundCount} trunc=${s.truncated} ms=${s.cpuMs.toFixed(0)}`,
   );

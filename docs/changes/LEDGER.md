@@ -7,3 +7,4 @@
 | EOWC-CHG-20261126-003 | Real-DEM terrain of the Reno-Stead area and the night sky |
 | EOWC-CHG-20261126-004 | User interface: controls, timeline, charts, tour, about |
 | EOWC-CHG-20261126-005 | Aggregate RHACO data snapshot and its generator |
+| EOWC-CHG-20261126-006 | Integrate worker, GPU track replay, detector, stage and app; physics unit tests |
