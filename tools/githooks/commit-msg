@@ -1,0 +1,7 @@
+#!/bin/sh
+# commit-msg hook -- validates only, never stages or writes.
+# Adapted from RHACO-SOP-20260708-001 v4 section 5: the whole message must be
+# printable ASCII (0x20-0x7E + LF), and line 1 must be
+# "EOWC-<TYPE>-<YYYYMMDD>-<SEQ>: <summary>" of at most 72 characters.
+# Merge commits are exempt.
+node "$(dirname "$0")/../check-commit-msg.mjs" "$1"
