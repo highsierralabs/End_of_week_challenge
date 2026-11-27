@@ -1,0 +1,30 @@
+html, body { height: auto; overflow: auto; }
+#validation { max-width: 980px; margin: 0 auto; padding: 28px 18px 60px; }
+.lv-intro h1 { font: 600 15px/1 var(--sans); letter-spacing: 0.3em; text-transform: uppercase; margin: 0 0 16px; }
+.lv-intro h1::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--red); margin-right: 10px; vertical-align: 1px; }
+.lv-intro p { color: #cfccc4; font-size: 14px; line-height: 1.55; max-width: 72ch; }
+.lv-summary { font: 13px/1.4 var(--mono); color: var(--amber) !important; }
+.lv-summary.good { color: #6fd08c !important; }
+.lv-summary.bad { color: var(--red) !important; }
+.lv-card { border: 1px solid var(--edge); border-radius: 6px; background: var(--body); margin-top: 18px; overflow: hidden; }
+.lv-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--edge); }
+.lv-head h2 { margin: 0; font: 600 15px/1.25 var(--sans); }
+.lv-badge { font: 600 10px/1 var(--sans); letter-spacing: 0.16em; text-transform: uppercase; padding: 6px 8px; border-radius: 3px; border: 1px solid var(--edge); color: var(--dim); white-space: nowrap; }
+.lv-badge.good { color: #6fd08c; border-color: #2f5c3c; }
+.lv-badge.bad { color: var(--red); border-color: #6a2a20; }
+.lv-body { display: grid; grid-template-columns: 176px 1fr; gap: 16px; padding: 14px 16px 12px; }
+.lv-img { width: 176px; height: 176px; object-fit: cover; border-radius: 3px; background: #000; }
+.lv-text p { margin: 0 0 10px; color: #cfccc4; font-size: 13px; line-height: 1.5; }
+.lv-table { width: 100%; border-collapse: collapse; font: 12px/1.4 var(--mono); }
+.lv-table th { text-align: right; font-weight: 500; color: var(--dim); padding: 3px 0 3px 12px; border-bottom: 1px solid var(--edge); }
+.lv-table td { text-align: right; padding: 4px 0 4px 12px; border-bottom: 1px solid #222326; white-space: nowrap; }
+.lv-table td:first-child, .lv-table th:first-child { text-align: left; padding-left: 0; white-space: normal; font-family: var(--sans); color: var(--ink); }
+.lv-table tr.lv-fail td { color: var(--red); }
+.lv-meta { color: var(--dim) !important; font: 11px/1.4 var(--mono) !important; margin-top: 8px !important; }
+.lv-err { color: var(--red) !important; }
+@media (max-width: 700px) {
+  .lv-body { grid-template-columns: 1fr; }
+  .lv-img { width: 100%; height: auto; aspect-ratio: 1; max-width: 256px; }
+  .lv-table { font-size: 11px; }
+  .lv-table th:nth-child(5), .lv-table td:nth-child(5) { display: none; }
+}

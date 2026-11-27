@@ -137,12 +137,13 @@ void main() {
   vec3 srd = vec3(0.0, 1.0, 0.0);
   float smax = 0.0;
   float scontrib = 0.0;
+  int sskip = -1;
 
   for (int it = 0; it < 160; it++) {
     bool isShadow = shadow;
     if (!isShadow && !alive) break;
     Hit h;
-    bool found = intersectScene(isShadow ? sro : ro, isShadow ? srd : rd, isShadow ? smax : INF, isShadow, h);
+    bool found = intersectScene(isShadow ? sro : ro, isShadow ? srd : rd, isShadow ? smax : INF, isShadow, isShadow ? sskip : -1, h);
     if (isShadow) {
       if (!found) L += scontrib;
       shadow = false;
@@ -212,7 +213,7 @@ void main() {
           // The light shines only within a cone about its normal: draw the emission direction
           // from that cone and find the point on the aperture it must have left from.
           vec3 ln = normalize(vec3(lightTexel(l, 1).y, lightTexel(l, 2).y, lightTexel(l, 3).y));
-          vec3 e = coneDir(ln, lm1.y, vec2(rnd(), rnd()));
+          vec3 e = coneDir(ln, lm1.z, vec2(rnd(), rnd()));
           vec3 lc = objTexel(lo, 6).xyz;
           float s = dot(p - lc, ln) / dot(e, ln);
           if (s > 4.0 * EPS) {
@@ -223,7 +224,7 @@ void main() {
             if (lot == T_DISC ? dot(q, q) <= 1.0 : (abs(q.x) <= 1.0 && abs(q.y) <= 1.0)) {
               wi = -e;
               dist = s;
-              lpdf = pick / (2.0 * PI * (1.0 - lm1.y));
+              lpdf = pick / (2.0 * PI * lm1.z);
             }
           }
         } else if (lot == T_SPHERE) {
@@ -231,11 +232,12 @@ void main() {
           float dc2 = dot(oc, oc);
           float r2 = L0.w / (4.0 * PI);
           if (dc2 > r2 * 1.0001) {
-            float cosMax = sqrt(max(0.0, 1.0 - r2 / dc2));
-            wi = coneDir(oc * inversesqrt(dc2), cosMax, vec2(rnd(), rnd()));
+            float omc = omcOf(r2 / dc2);
+            wi = coneDir(oc * inversesqrt(dc2), omc, vec2(rnd(), rnd()));
             float b = dot(oc, wi);
-            dist = b - sqrt(max(0.0, b * b - (dc2 - r2)));
-            lpdf = pick / (2.0 * PI * (1.0 - cosMax));
+            vec3 perp = oc - wi * b;
+            dist = b - sqrt(max(0.0, r2 - dot(perp, perp)));
+            lpdf = pick / (2.0 * PI * omc);
           }
         } else {
           vec3 lp;
@@ -260,6 +262,7 @@ void main() {
             sro = p + ng * EPS;
             srd = wi;
             smax = dist - 4.0 * EPS;
+            sskip = lo;
           }
         }
       }
@@ -354,8 +357,8 @@ void main() {
   float alpha;
   float Le = lm1.x * spec(int(lm0.y));
   if (int(lm0.x) == M_BEAM) {
-    rd = coneDir(ln, lm1.y, vec2(rnd(), rnd()));
-    alpha = Le * dot(rd, ln) * L0.w * 2.0 * PI * (1.0 - lm1.y) / pick;
+    rd = coneDir(ln, lm1.z, vec2(rnd(), rnd()));
+    alpha = Le * dot(rd, ln) * L0.w * 2.0 * PI * lm1.z / pick;
   } else {
     // Aim at the bounding sphere of one specular object; the density is the mixture over all.
     int k = min(int(rnd() * float(uNumTargets)), uNumTargets - 1);
@@ -363,7 +366,7 @@ void main() {
     vec3 oc = tg.xyz - lp;
     float dc2 = dot(oc, oc);
     vec2 u = vec2(rnd(), rnd());
-    if (dc2 > tg.w * tg.w) rd = coneDir(oc * inversesqrt(dc2), sqrt(1.0 - tg.w * tg.w / dc2), u);
+    if (dc2 > tg.w * tg.w) rd = coneDir(oc * inversesqrt(dc2), omcOf(tg.w * tg.w / dc2), u);
     else rd = cosineDir(ln, u);
     float cl = dot(rd, ln);
     if (cl <= 0.0) return;
@@ -373,8 +376,9 @@ void main() {
       vec3 oj = tj.xyz - lp;
       float dj2 = dot(oj, oj);
       if (dj2 > tj.w * tj.w) {
-        float cm = sqrt(1.0 - tj.w * tj.w / dj2);
-        if (dot(rd, oj) * inversesqrt(dj2) >= cm) pdfW += 1.0 / (2.0 * PI * (1.0 - cm));
+        float sin2 = tj.w * tj.w / dj2;
+        vec3 cr = cross(rd, oj);
+        if (dot(rd, oj) > 0.0 && dot(cr, cr) <= sin2 * dj2) pdfW += 1.0 / (2.0 * PI * omcOf(sin2));
       } else {
         pdfW += cl / PI;
       }
@@ -396,7 +400,7 @@ void main() {
   vec2 cpix = vec2(0.0);
   for (int it = 0; it < 100; it++) {
     Hit h;
-    bool found = intersectScene(connect ? cro : ro, connect ? crd : rd, connect ? cmax : INF, connect, h);
+    bool found = intersectScene(connect ? cro : ro, connect ? crd : rd, connect ? cmax : INF, connect, -1, h);
     if (connect) {
       if (!found) { outPos = vec4(cpix, 1.0, 0.0); outVal = vec4(cval, 0.0); }
       return;

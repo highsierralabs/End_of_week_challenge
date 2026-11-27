@@ -7,7 +7,8 @@
 //             0..2 world-to-object rows, 3 (type, material, light index, 0),
 //             4 shape parameters, 5 world bounding sphere (xyz, r), 6 world position
 //   uMat    RGBA32F, 2 texels per material row: (type, spectrum A, spectrum B, roughness),
-//             (emission scale, p1, p2, p3)
+//             (emission scale, p1, p2, p3); for a beam p1..p3 are the cosine, 1 - cosine and
+//             squared sine of its half-angle
 //   uPlanes RGBA32F, 256 wide: polytope planes (n, d) in object space
 //   uSpec   R32F, NS wide: one spectrum per row, linear in wavelength from LAM0 to LAM1
 //   uLam    R32F, (NL + 1) x 1: inverse CDF of the wavelength sampler
@@ -124,10 +125,14 @@ vec3 cosineDir(vec3 n, vec2 u) {
   basis(n, t, b);
   return normalize(t * d.x + b * d.y + n * sqrt(max(0.0, 1.0 - dot(d, d))));
 }
-// Uniform direction in the cone of half-angle acos(cosMax) about n.
-vec3 coneDir(vec3 n, float cosMax, vec2 u) {
-  float c = 1.0 - u.x * (1.0 - cosMax);
-  float s = sqrt(max(0.0, 1.0 - c * c));
+// Uniform direction in a cone about n. The cone is given as omc = 1 - cos(half-angle), and
+// omcOf() gets that from sin^2 without cancellation: lamps and beams are often cones a
+// fraction of a degree wide, where 1 - cos computed in single precision is mostly rounding.
+float omcOf(float sin2) { return sin2 / (1.0 + sqrt(max(0.0, 1.0 - sin2))); }
+vec3 coneDir(vec3 n, float omc, vec2 u) {
+  float k = u.x * omc;
+  float c = 1.0 - k;
+  float s = sqrt(max(0.0, k * (2.0 - k)));
   float ph = 2.0 * PI * u.y;
   vec3 t, b;
   basis(n, t, b);
@@ -382,13 +387,16 @@ void hitMesh(vec3 o, vec3 d, int root, bool anyHit, inout float bt, inout vec3 b
 }
 
 // Nearest hit along the ray before tmax (rd must be unit length). With anyHit the search stops
-// at the first blocker, which is all a shadow ray needs.
-bool intersectScene(vec3 ro, vec3 rd, float tmax, bool anyHit, out Hit hit) {
+// at the first blocker, which is all a shadow ray needs. Object 'skip' is ignored: a shadow
+// ray toward a lamp must not be stopped by rounding on the lamp's own surface (lamps that are
+// sampled are convex, so they never truly shade the point aimed at).
+bool intersectScene(vec3 ro, vec3 rd, float tmax, bool anyHit, int skip, out Hit hit) {
   hit.t = tmax;
   hit.obj = -1;
   hit.n = vec3(0.0, 1.0, 0.0);
   hit.ns = hit.n;
   for (int i = 0; i < uNumObj; i++) {
+    if (i == skip) continue;
     vec4 bs = objTexel(i, 5);
     vec3 oc = ro - bs.xyz;
     float b = dot(oc, rd);
@@ -544,7 +552,11 @@ void evalBsdf(int mtype, vec4 m0, vec3 n, vec3 wo, vec3 wi, out float fcos, out 
 float emitted(int mtype, vec4 m0, vec4 m1, vec3 n, vec3 dir) {
   float c = dot(n, dir);
   if (c <= 0.0) return 0.0;
-  if (mtype == M_BEAM && c < m1.y) return 0.0;
+  if (mtype == M_BEAM) {
+    // Inside the beam's cone? Compared by sine, which stays exact for narrow beams.
+    vec3 cr = cross(n, dir);
+    if (dot(cr, cr) > m1.w) return 0.0;
+  }
   return m1.x * spec(int(m0.y));
 }
 
@@ -631,8 +643,7 @@ float lightPdf(int l, int otype, vec3 x, vec3 p, vec3 n) {
     float dc2 = dot(oc, oc);
     float r2 = L0.w / (4.0 * PI);
     if (dc2 <= r2 * 1.0001) return 0.0;
-    float cosMax = sqrt(max(0.0, 1.0 - r2 / dc2));
-    return lightWeight(l) / gLightSum / (2.0 * PI * (1.0 - cosMax));
+    return lightWeight(l) / gLightSum / (2.0 * PI * omcOf(r2 / dc2));
   }
   float c = abs(dot(n, d)) / sqrt(d2);
   if (c < 1.0e-6) return 0.0;

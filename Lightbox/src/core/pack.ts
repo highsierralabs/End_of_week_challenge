@@ -41,6 +41,12 @@ export interface Packed {
 
 const DEG = Math.PI / 180;
 
+/** Cosine, one minus cosine and squared sine of a beam's half-angle (degrees), each computed directly. */
+function beamCone(spread: number): [number, number, number] {
+  const t = Math.max(0.05, Math.min(89, spread)) * DEG;
+  return [Math.cos(t), 2 * Math.sin(t / 2) ** 2, Math.sin(t) ** 2];
+}
+
 /** Luminance (cd/m2) of an emitter of the given shape and total luminous flux. */
 export function emitterLuminance(o: SceneObject): number {
   const m = o.material;
@@ -121,7 +127,7 @@ export function packScene(scene: Scene, meshes: MeshLookup): Packed {
         break;
       }
       case 'light': rec = [MAT_TYPE.light, row(`l${JSON.stringify(m.spectrum)}`, () => lightSpectrum(m.spectrum)), 0, 0, luminance, 0, 0, 0]; break;
-      case 'beam': rec = [MAT_TYPE.beam, row(`l${JSON.stringify(m.spectrum)}`, () => lightSpectrum(m.spectrum)), 0, 0, luminance, Math.cos(Math.max(0.05, Math.min(89, m.spread)) * DEG), 0, 0]; break;
+      case 'beam': rec = [MAT_TYPE.beam, row(`l${JSON.stringify(m.spectrum)}`, () => lightSpectrum(m.spectrum)), 0, 0, luminance, ...beamCone(m.spread)]; break;
       case 'grating': rec = [MAT_TYPE.grating, 0, 0, 0, 0, 1e6 / m.linesPerMm, 0, 0]; break;
     }
     mats.push(rec);
