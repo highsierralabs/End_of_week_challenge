@@ -1,0 +1,42 @@
+:root {
+  --paper: #efe8d8;
+  --ink: #1c1916;
+  --ink-2: rgba(28, 25, 22, 0.66);
+  --ink-3: rgba(28, 25, 22, 0.25);
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--serif); font-size: 17px; line-height: 1.55; }
+main { max-width: 820px; margin: 0 auto; padding: 24px 22px 60px; }
+a { color: #2f5fa8; }
+h1 { font-size: 34px; font-variant: small-caps; margin: 6px 0 4px; font-weight: 600; }
+h2 { font-size: 21px; margin: 38px 0 6px; font-variant: small-caps; letter-spacing: 0.02em; font-weight: 600; }
+h3 { font-size: 16px; margin: 6px 0; font-weight: 600; }
+h3 span { font-weight: 400; color: var(--ink-2); font-size: 14px; }
+.v-back { margin: 0; font-size: 15px; }
+.v-lede { font-size: 18px; }
+.v-status { font-style: italic; color: #bd3b26; }
+.v-note { font-size: 15.5px; color: var(--ink-2); }
+.v-scroll { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 14.5px; font-variant-numeric: tabular-nums lining-nums; margin: 10px 0; }
+th, td { padding: 3px 10px; text-align: right; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+thead th { font-weight: 600; border-bottom: 1px solid var(--ink); }
+tbody tr:nth-child(even) { background: rgba(28, 25, 22, 0.035); }
+tr.v-hl td { color: #bd3b26; }
+tr.v-hl:nth-child(9) td { color: #2f5fa8; }
+.v-two { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 680px) { .v-two { grid-template-columns: 1fr; } }
+.v-chart { margin: 14px 0 4px; }
+.v-chart svg { width: 100%; height: auto; display: block; font-family: var(--serif); }
+.v-chart figcaption { font-size: 14px; color: var(--ink-2); margin-top: 4px; }
+.v-grid { stroke: var(--ink-3); stroke-width: 1; }
+.v-tick { font-size: 12px; fill: var(--ink-2); }
+.v-axis { font-size: 13px; fill: var(--ink); }
+.v-ref { stroke: rgba(28, 25, 22, 0.45); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.v-reflabel { font-size: 13px; fill: var(--ink-2); font-style: italic; }
+.v-dlabel { font-size: 13px; fill: var(--ink); }
+.v-pt { cursor: default; }
+.v-key { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin: 0 5px 0 10px; border-radius: 2px; }
+.v-key-ref { background: repeating-linear-gradient(90deg, rgba(28,25,22,0.5) 0 4px, transparent 4px 8px); }
+footer { margin-top: 40px; font-size: 14.5px; color: var(--ink-2); border-top: 1px solid var(--ink-3); }

@@ -61,7 +61,9 @@ Prussian blue is down, and the black lines are where the membrane is still.</li>
 <p>The solver is checked against exact answers. For the unit square and the unit disc its frequencies are within 1% of
 the true ones. For the twins, every one of the first 25 eigenvalues is within 1% of Tobin Driscoll's 12-digit values
 (<em>SIAM Review</em>, 1997), and the ninth mode, which is the triangle's own first mode, is within 0.2% of exactly
-5&pi;&sup2;/4. The higher modes are less accurate than the low ones, because fewer triangles span each wave.</p>
+5&pi;&sup2;/4. The higher modes are less accurate than the low ones, because fewer triangles span each wave. The
+<a href="validation.html">validation page</a> reruns all of these checks in your browser and shows how the error falls as
+the mesh is refined.</p>
 <p>The drum is an ideal membrane. It has no air loading, no stiffness and no air cavity behind it, so it sounds
 cleaner and more bell-like than a real timpani or tom. The losses are a simple model chosen to sound plausible, not
 measured from a real drum. <em>Pitch</em> sets the membrane's wave speed, which depends on its tension and weight.

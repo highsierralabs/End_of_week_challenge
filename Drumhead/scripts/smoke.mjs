@@ -2,7 +2,7 @@
 //          subfolder (/drumhead/), in GPU Chromium, on a desktop and a phone viewport. Checks the
 //          boot, the circle's fundamental against the exact value, the twins' isospectrality, a
 //          freehand drawing, sand mode, the listening game, the mode gallery, an offline audio
-//          render, and that no page errors were raised.
+//          render, the validation page, and that no page errors were raised.
 // USAGE:   npm run build && node scripts/smoke.mjs
 // OUTPUT:  one ASCII line per check and "smoke: PASS" or "smoke: FAIL"; exit 0 / 1.
 // VERSION HISTORY:
@@ -99,6 +99,18 @@ try {
     check(q2.done && q2.score === 1, `listen: round answered (${q.answer}), score ${q2.score} of ${q2.rounds}`);
 
     check(errors.length === 0, `desktop: no page errors${errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''}`);
+    await page.close();
+  }
+  // Validation page: every check recomputed in the browser.
+  {
+    const page = await browser.newPage({ viewport: { width: 1000, height: 800 } });
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto(base + 'validation.html');
+    await page.waitForFunction(() => document.documentElement.dataset.done === '1', null, { timeout: 120000 });
+    const rows = await page.evaluate(() => document.querySelectorAll('.v-gww-table tbody tr').length);
+    const finest = await page.evaluate(() => document.querySelector('.v-gww-table tbody tr td:last-child').textContent);
+    check(rows === 25 && errors.length === 0, `validation: 25 Driscoll rows, mode 1 error ${finest} at the finest mesh, no errors`);
     await page.close();
   }
   // Phone.
