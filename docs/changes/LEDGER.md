@@ -25,3 +25,4 @@
 | EOWC-FIX-20261126-021 | Thinning: keep-all fallback at the weight limit (energy-conserving), weight factor 1000 |
 | EOWC-FIX-20261126-022 | UI QA fixes: tour placement, phone layout, timing chart per core-distance ring, validation table |
 | EOWC-CHG-20261126-023 | Regenerate rate, validation and core-hit data on the fixed engine; docs to final numbers |
+| EOWC-DOC-20261126-024 | Refresh README screenshots |
