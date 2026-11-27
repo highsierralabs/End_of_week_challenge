@@ -41,6 +41,8 @@ Either way the output must have an `index.html` and must work from a subfolder. 
   "date": "2026-11-27",
   "image": "Cascade/docs/screenshots/card.jpg",
   "imageAlt": "What the picture shows",
+  "clip": "Cascade/docs/screenshots/shower.gif",
+  "clipAlt": "What the clip shows",
   "tech": ["WebGPU", "TypeScript"],
   "tag": "cascade-v1.0.0"
 }
@@ -53,6 +55,7 @@ Either way the output must have an `index.html` and must work from a subfolder. 
 | `title`, `tagline`, `summary` | The text of its entry on the index page. |
 | `date` | The Friday the week ended, `YYYY-MM-DD`. Entries are numbered in date order and listed newest first. |
 | `image`, `imageAlt` | Optional picture for the entry: 16:9, about 1200 px wide, under 300 KB. |
+| `clip`, `clipAlt` | Optional animated GIF that plays on the index in place of the picture, normally the README's lead clip. Near 16:9 (it is cropped to fill), under about 4 MB. It needs `image`, which visitors who ask for reduced motion see instead. `clipAlt` defaults to `imageAlt`. |
 | `tech` | Optional short labels. |
 | `out` | Optional output folder inside `dir`. The default is `dist`. |
 | `tag` | Optional release tag, for reference. |
@@ -79,7 +82,7 @@ does, is the stricter test.
 
 1. The challenge folder has a README that says what the build is, how to run it and what was verified.
 2. `THIRD-PARTY-NOTICES.md` lists any third-party code, data or assets the build ships.
-3. The manifest entry and the root README's list are added.
+3. The manifest entry (with its card image and the README's lead clip) and the root README's list are added.
 4. The gate passes, and its tuple line goes into the body of the last commit before the push
    ([GOVERNANCE.md](GOVERNANCE.md), rule 9).
 5. The release is tagged `<slug>-vX.Y.Z` and pushed with `--follow-tags`.

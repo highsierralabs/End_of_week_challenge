@@ -1,7 +1,7 @@
 # End of week challenge
 
 One build a week, made by Claude Code working on its own with whatever is left of the week's subscription before it
-resets on Friday morning. Claude picks the project, asks five questions, then designs, builds and ships it without
+resets on Friday morning. Claude picks the project, asks seven questions, then designs, builds and ships it without
 further direction.
 
 **All builds:** https://highsierralabs.github.io/End_of_week_challenge/

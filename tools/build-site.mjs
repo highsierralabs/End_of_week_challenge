@@ -8,6 +8,8 @@
 //          One ASCII line per step and "site: PASS" or "site: FAIL"; exit 0 / 1.
 // VERSION HISTORY:
 //   1.0  2026-11-27  Initial release.
+//   1.1  2026-11-27  Optional animated clip per entry (manifest "clip"); the still image stays as the
+//                    picture for visitors who ask for reduced motion.
 import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { extname, join } from 'node:path';
@@ -36,6 +38,9 @@ export function loadManifest() {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(c.date ?? '')) findings.push(`${id}: date must be YYYY-MM-DD`);
     if (c.image && !existsSync(join(root, c.image))) findings.push(`${id}: image "${c.image}" does not exist`);
     if (c.image && !c.imageAlt) findings.push(`${id}: image needs imageAlt`);
+    if (c.clip && !existsSync(join(root, c.clip))) findings.push(`${id}: clip "${c.clip}" does not exist`);
+    if (c.clip && extname(c.clip).toLowerCase() !== '.gif') findings.push(`${id}: clip must be a .gif`);
+    if (c.clip && !c.image) findings.push(`${id}: clip needs a still image for reduced motion`);
   }
   if (findings.length) throw new Error(findings.join('\n'));
   return {
@@ -53,8 +58,13 @@ function longDate(iso) {
 
 function entryHtml(c, number, repo) {
   const href = `${c.slug}/`;
+  const still = c.image && `assets/${c.slug}${extname(c.image)}`;
+  // With a clip, the GIF plays and the still is what reduced-motion visitors get instead.
+  const picture = c.clip
+    ? `<picture><source media="(prefers-reduced-motion: reduce)" srcset="${still}" /><img src="assets/${c.slug}-clip.gif" alt="${esc(c.clipAlt ?? c.imageAlt)}" loading="lazy" /></picture>`
+    : `<img src="${still}" alt="${esc(c.imageAlt)}" loading="lazy" />`;
   const shot = c.image
-    ? `          <a class="shot" href="${href}" tabindex="-1" aria-hidden="true"><img src="assets/${c.slug}${extname(c.image)}" alt="${esc(c.imageAlt)}" loading="lazy" /></a>\n`
+    ? `          <a class="shot" href="${href}" tabindex="-1" aria-hidden="true">${picture}</a>\n`
     : '';
   const tech = (c.tech ?? []).map((t) => `<li>${esc(t)}</li>`).join('');
   return `        <article class="entry">
@@ -102,6 +112,7 @@ function main() {
     if (!existsSync(join(out, 'index.html'))) { fail(`${c.slug}: ${c.dir}/${c.out}/index.html is missing`); continue; }
     cpSync(out, join(site, c.slug), { recursive: true });
     if (c.image) cpSync(join(root, c.image), join(site, 'assets', `${c.slug}${extname(c.image)}`));
+    if (c.clip) cpSync(join(root, c.clip), join(site, 'assets', `${c.slug}-clip.gif`));
 
     // A challenge is served from /<repo>/<slug>/, so a root-absolute URL in its pages would miss.
     const pages = walk(join(site, c.slug)).filter((f) => f.endsWith('.html'));
@@ -128,7 +139,7 @@ function main() {
   // Every relative link on the root pages must land on a file in _site.
   for (const name of readdirSync(site).filter((f) => f.endsWith('.html'))) {
     const html = readFileSync(join(site, name), 'utf8');
-    for (const m of html.matchAll(/\b(?:src|href|url)=["']?([^"'\s>]+)/g)) {
+    for (const m of html.matchAll(/\b(?:src|srcset|href|url)=["']?([^"'\s>]+)/g)) {
       const url = m[1];
       if (/^(?:[a-z]+:|#)/i.test(url)) continue;
       const target = join(site, decodeURI(url.split(/[?#]/)[0]));
