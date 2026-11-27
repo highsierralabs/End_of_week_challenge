@@ -23,6 +23,7 @@ try {
   });
   for (const [label, query] of [['WebGPU', ''], ['WebGL2', '?webgl']]) {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    await page.addInitScript(() => localStorage.setItem('cascade.welcomed.v1', '1'));
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });

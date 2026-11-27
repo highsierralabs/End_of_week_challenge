@@ -29,3 +29,4 @@
 | EOWC-CHG-20261126-025 | Smoke test of the production build on both backends, as a gate member |
 | EOWC-DOC-20261126-026 | Animated README clips (shower, sky) and the clip renderer |
 | EOWC-CHG-20261126-027 | First-visit welcome card with three ways in |
+| EOWC-FIX-20261126-028 | Automation scripts pre-dismiss the welcome card |
