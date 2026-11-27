@@ -40,7 +40,7 @@ export class ShowerLayer {
   readonly uDpr = uniform(1);
   readonly uDensity = uniform(1);
   /** Per-class brightness (photons are numerous; keep them a soft glow). */
-  readonly classGain = uniformArray([0.14, 0.62, 0.62, 0.85, 1.8], 'float');
+  readonly classGain = uniformArray([0.14, 0.62, 0.62, 0.85, 1.0], 'float');
   private density = 1;
   readonly mask = uniformArray(new Array<number>(RCLASS_COUNT).fill(1), 'float');
   readonly palette: ReturnType<typeof uniformArray>;
@@ -93,6 +93,10 @@ export class ShowerLayer {
     g.instanceCount = n;
     // Additive blending: keep the summed brightness roughly independent of the track count.
     this.density = Math.min(1, 1.6 / Math.sqrt(Math.max(n, 1) / 10000));
+    // Bigger showers carry heavier weights and more energetic segments: temper with E0 so a
+    // 100 PeV shower is brighter than a 1 PeV one without washing out.
+    const e0 = r.params.energyEV / 1e15;
+    this.density *= Math.min(1.6, Math.max(0.15, Math.pow(e0, -0.3)));
     this.uDensity.value = this.density;
     const mesh = new THREE.Mesh(g, this.trackMat);
     mesh.frustumCulled = false;
@@ -218,7 +222,7 @@ export class ShowerLayer {
     const visible = landed.mul(float(this.mask.element(cls) as unknown as Node<'float'>)).mul(this.uSplash);
     const flash = exp(max(dt, 0).negate().div(this.uFade.mul(0.35)));
     const wFac = clamp(log(aInfo.z.add(1)).mul(0.18).add(0.4), 0.4, 2.2);
-    const bright = visible.mul(mix(this.uPersist.mul(0.8), float(1), flash)).mul(this.uIntensity).mul(0.9);
+    const bright = visible.mul(mix(this.uPersist.mul(0.8), float(1), flash)).mul(this.uIntensity).mul(clamp(this.uDensity.mul(1.6), 0.12, 1)).mul(0.75);
     const vBright = float(varying(bright, 'vSplashBright') as unknown as Node<'float'>);
     const vColor = vec3(varying(this.palette.element(cls), 'vSplashColor') as unknown as Node<'vec3'>);
     const vUv = varying(positionGeometry.xy.mul(vec2(1, 2)).sub(vec2(0, 1)), 'vSplashUv');

@@ -3,6 +3,7 @@
 //   lateral   - ground density vs core distance in the shower plane, NKG overlay
 //   footprint - 2D ground density map around the core
 //   timing    - arrival delay behind a plane front moving at c (shower-front thickness)
+//   telescope - fluorescence-telescope camera view, drawn by ./telescope.ts
 import { gaisserHillas, nkgDensity, showerAge, xmaxNucleusMatthews, xmaxPhoton } from '../physics/analytic';
 import { moliereRadiusM, TOP_ALTITUDE_M, verticalDepth } from '../physics/atmosphere';
 import { GND, GND_STRIDE, PRIMARY_MASS_NUMBER, RClass, RCLASS_COUNT, type ShowerResult } from '../physics/types';
@@ -13,8 +14,9 @@ import {
   Axis, clipTo, decadeCeil, decadeFloor, drawAxes, drawPow10, drawSeries, haloText, INK, linearTicks, logTicks, MONO,
   niceStep, SANS, Surface, tagText, type Rect,
 } from './plot';
+import { FD_CAPTION, TelescopeView } from './telescope';
 
-export type ChartTab = 'profile' | 'lateral' | 'footprint' | 'timing';
+export type ChartTab = 'profile' | 'lateral' | 'footprint' | 'timing' | 'telescope';
 
 const C_M_PER_NS = 0.299792458;
 
@@ -35,6 +37,7 @@ const TABS: { id: ChartTab; label: string; caption: string }[] = [
     id: 'timing', label: 'Timing',
     caption: 'Arrival delay behind a flat front moving at c through the core, for particles in one ring of core distance (measured in the shower plane, as in the lateral chart); each class normalised to unit area. At a given distance from the core muons arrive first, and electrons and photons trail with a long tail; the spread grows with distance. Pooled over all distances, muons look later only because they spread farther out, where the front is more curved.',
   },
+  { id: 'telescope', label: 'Telescope', caption: FD_CAPTION },
 ];
 
 interface Group { id: string; label: string; color: string; classes: RClass[] }
@@ -103,6 +106,7 @@ export class ChartsPanel {
   private footMaxCache: { key: string; d: Derived | null; max: number } = { key: '', d: null, max: 0 };
   private radial: RadialFilter = '50-300';
   private timingCache: { key: string; th: TimingHist | null } = { key: '', th: null };
+  private readonly fd = new TelescopeView();
 
   constructor(el: HTMLElement) {
     this.el = el;
@@ -207,6 +211,8 @@ export class ChartsPanel {
         ['0-50', 'r 0–50 m'], ['50-300', 'r 50–300 m'], ['300-1000', 'r 300–1000 m'], ['all', 'all distances'],
       ], this.radial, (v) => { this.radial = v as RadialFilter; this.draw(); });
       this.options.append(rad);
+    } else if (this.tab === 'telescope') {
+      this.fd.buildOptions(this.options, () => this.draw());
     } else {
       this.options.append(h('span', { class: 'cx-copts-hint', text: this.tab === 'profile' ? 'slant depth along the axis' : 'shower-plane distance' }));
     }
@@ -217,7 +223,8 @@ export class ChartsPanel {
   private draw(): void {
     const w = this.wrap.clientWidth;
     if (w <= 0) return;
-    const ht = Math.round(Math.min(Math.max(w * 0.8, 250), 420));
+    const fdTab = this.tab === 'telescope';
+    const ht = Math.round(Math.min(Math.max(w * (fdTab ? 1.12 : 0.8), 250), fdTab ? 500 : 420));
     this.surface.canvas.style.height = `${ht}px`;
     this.wrap.style.height = `${ht}px`;
     if (!this.surface.fit(w, ht)) return;
@@ -232,7 +239,12 @@ export class ChartsPanel {
       if (this.tab === 'profile') this.drawProfile(d);
       else if (this.tab === 'lateral') this.drawLateral(d);
       else if (this.tab === 'footprint') this.drawFootprint(d);
-      else this.drawTiming(d);
+      else if (this.tab === 'telescope') {
+        const o = this.fd.draw(this.surface, d.r, this.tNs);
+        this.setEmpty(o.empty);
+        this.setLegend(o.empty ? [] : o.legend, o.empty ? undefined : o.note);
+        this.hover = o.hover;
+      } else this.drawTiming(d);
     } catch (err) {
       // A chart must never take the app down; show the failure in place.
       this.setEmpty(`Chart unavailable: ${(err as Error).message}`);

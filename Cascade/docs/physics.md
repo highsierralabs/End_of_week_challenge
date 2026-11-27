@@ -172,6 +172,20 @@ from it.
   secondaries made in the lead, neutron capture gamma rays, the CsI response, solar
   modulation, and temperature effects.
 
+## 8a Fluorescence telescope (`telescope.ts`)
+
+A simplified fluorescence detector:
+- **The eye.** It sits 18 km from the core at 1700 m, side-on to the shower, with a 30 x 30 degree camera of 440
+  hexagonal 1.5 degree pixels and a 3 m^2 aperture.
+- **The light.** The charged longitudinal profile is treated as a moving point source on the axis.
+  - Deposit: 2.2 MeV per g/cm^2 per charged particle.
+  - Yield: about 20 photons per MeV over 300-420 nm. The 337 nm band alone is about 5.6, from AIRFLY.
+  - Emission is isotropic, falls off as `A / (4 pi d^2)`, and is attenuated as `exp(-d / 18 km)`.
+  - Emission time: when a plane front moving at c passes the point. Arrival time: plus d/c.
+- **Checks.** The unit tests verify the shower-detector-plane timing law, inverse-square scaling and causality.
+- **Not modelled:** Cherenkov light (the main background of real eyes), the lateral width of the shower, light
+  scattering, optics and noise. The deposit comes out at about half of E0 because sub-cut electrons are not added back.
+
 ## 9 Shower-core hits (`scripts/precompute-corehits.ts`)
 
 For each energy from 10^14 to 10^18 eV in half-decade steps, the script runs three 20-degree proton showers and

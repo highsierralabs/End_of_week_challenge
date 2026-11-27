@@ -23,11 +23,13 @@ the observatory's own measurements.
 - **Simulate** any primary at any energy, zenith and azimuth, and land the core where you like relative to the detector.
 - **Replay** in 3D with five camera presets (overview, follow the front, side, ground, detector), per-species
   toggles (photons, electrons, positrons, muons, hadrons) and a scrubbable shower clock. Press **H** to hide the interface.
-- **Read the shower** in four live charts:
+- **Read the shower** in five live charts:
   - the longitudinal profile, with a Gaisser-Hillas fit and the Heitler-Matthews reference;
   - the lateral distribution against the NKG function;
   - the ground footprint;
-  - arrival times relative to a plane front.
+  - arrival times relative to a plane front, by core distance;
+  - a fluorescence telescope 18 km away, in the style of the Pierre Auger Observatory's eyes. The shower's light track
+    crosses a 440-pixel hexagonal camera over tens of microseconds, with pixel time traces.
 - **Sky mode** shows a faithful slice of real time over the valley: about 100 µs of showers above 20 TeV, with
   Poisson arrival times, energies drawn from the spectrum, and every shower simulated.
 - **Listen** (press **S**): each ground arrival clicks, pitched by species, and a hiss rises as the front comes down.
