@@ -90,6 +90,25 @@ export class Ink {
     c.moveTo(sx, sy - 11); c.lineTo(sx, sy - 4); c.moveTo(sx, sy + 4); c.lineTo(sx, sy + 11); c.stroke();
   }
 
+  /** The seven triangles a twin is built from, as faint dashed lines. */
+  pieces(view: View, tris: number[][]): void {
+    const c = this.c;
+    c.save();
+    c.setLineDash([3, 4]);
+    c.strokeStyle = 'rgba(28,25,22,0.22)';
+    c.lineWidth = 1;
+    for (const t of tris) {
+      c.beginPath();
+      for (let i = 0; i < 3; i++) {
+        const [sx, sy] = worldToScreen(view, t[2 * i]!, t[2 * i + 1]!);
+        if (i) c.lineTo(sx, sy); else c.moveTo(sx, sy);
+      }
+      c.closePath();
+      c.stroke();
+    }
+    c.restore();
+  }
+
   /** Small italic caption under a drum. */
   caption(view: View, text: string): void {
     const c = this.c;

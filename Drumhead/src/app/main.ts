@@ -8,13 +8,14 @@ import { Sand } from '../render/sand';
 import { DrumGL, screenToWorld, Stage, type DrawItem, type View } from '../render/stage';
 import { Strip, type StripRow } from '../render/strip';
 import { polyArea, type Poly } from '../solver/geometry';
-import { PRESETS } from '../solver/shapes';
+import { GWW, GWW_SCALE, PRESETS, scalePoly } from '../solver/shapes';
 import { discFundamental } from '../solver/spectrum';
 import { ABOUT_HTML } from './about';
 import { modeThumb } from './gallery';
 import { DEFAULT_TUNING, LiveDrum, type Tuning } from './live';
 import { formatNote } from './notes';
 import { Quiz } from './quiz';
+import { decodeOutline, encodeOutline } from './share';
 import { type DrumData, type SolveJob, type SolveReply, type SolveRequest } from './worker';
 
 type Mode = 'play' | 'draw' | 'sand' | 'listen';
@@ -51,6 +52,7 @@ app.innerHTML = `
     <canvas class="dh-gl"></canvas>
     <canvas class="dh-ink"></canvas>
     <div class="dh-busy" role="status"></div>
+    <button class="dh-btn dh-sweep" data-act="sweep" hidden aria-pressed="false">Sweep through the modes</button>
   </div>
   <div class="dh-bottom">
     <canvas class="dh-strip" aria-label="The drum's frequencies. Tap a mark to hear that mode."></canvas>
@@ -67,6 +69,7 @@ app.innerHTML = `
       <div class="dh-group">
         <button class="dh-btn" data-act="modes" title="Mode shapes (M)"><span>Modes</span></button>
         <button class="dh-btn" data-act="sound" title="Sound settings" aria-expanded="false"><span>Sound</span></button>
+        <button class="dh-btn" data-act="share" title="Copy a link to this drum"><span>Share</span></button>
         <button class="dh-btn" data-act="about" title="About (A)"><span>About</span></button>
         <button class="dh-btn" data-act="mute" title="Mute" aria-pressed="false">${icon('speaker')}</button>
       </div>
@@ -228,9 +231,10 @@ async function load(what: string | Poly): Promise<void> {
     });
     slots.forEach((s, i) => sendBank(s, i));
     current = typeof what === 'string' ? what : '';
-    if (typeof what === 'string') {
+    {
       const u = new URL(location.href);
-      u.searchParams.set('shape', what);
+      if (typeof what === 'string') { u.searchParams.set('shape', what); u.searchParams.delete('d'); }
+      else { u.searchParams.delete('shape'); u.searchParams.set('d', encodeOutline(data[0]!.outline)); }
       history.replaceState(null, '', u);
     }
     for (const b of shapesEl.querySelectorAll<HTMLButtonElement>('[data-shape]')) b.setAttribute('aria-pressed', String(b.dataset.shape === current));
@@ -355,6 +359,8 @@ function setMode(m: Mode): void {
   if (mode === 'sand' && m !== 'sand') audio.send({ type: 'drive', freq: driveF, gain: 0 });
   if (m === 'listen') void quiz.open(); else quiz.close();
   cardEl.hidden = m === 'listen';
+  sweepBtn.hidden = m !== 'sand';
+  if (m !== 'sand') setSweep(false);
   mode = m;
   stageEl.className = `dh-stage is-${m}`;
   for (const b of app.querySelectorAll<HTMLButtonElement>('[data-mode]')) b.setAttribute('aria-pressed', String(b.dataset.mode === m));
@@ -362,6 +368,42 @@ function setMode(m: Mode): void {
   if (m !== 'draw') { stroke = null; }
   if (m === 'draw' && slots.length === 2) { /* drawing replaces the twins with one drum */ }
   setHint();
+}
+
+const sweepBtn = $<HTMLButtonElement>('.dh-sweep');
+/** Sand sweep: glide from mode to mode and hold on each long enough for its figure to form. */
+let sweep: { k: number; t: number; from: number } | null = null;
+const SWEEP_GLIDE = 1.4, SWEEP_HOLD = 5.5, SWEEP_MODES = 24;
+function setSweep(on: boolean): void {
+  sweep = on && slots.length ? { k: nearestMode(driveF), t: SWEEP_GLIDE, from: driveF } : null;
+  sweepBtn.setAttribute('aria-pressed', String(!!sweep));
+  sweepBtn.textContent = sweep ? 'Stop the sweep' : 'Sweep through the modes';
+}
+function nearestMode(f: number): number {
+  const fr = slots[0]!.live.freqs;
+  let best = 0;
+  for (let k = 1; k < fr.length; k++) if (Math.abs(Math.log(fr[k]! / f)) < Math.abs(Math.log(fr[best]! / f))) best = k;
+  return best;
+}
+function stepSweep(dt: number): void {
+  if (!sweep || !slots.length) return;
+  const fr = slots[0]!.live.freqs;
+  sweep.t += dt;
+  const target = fr[sweep.k]!;
+  if (sweep.t < SWEEP_GLIDE) {
+    const a = sweep.t / SWEEP_GLIDE, e = a * a * (3 - 2 * a);
+    driveF = sweep.from * (target / sweep.from) ** e;
+  } else {
+    driveF = target;
+  }
+  for (const s of slots) s.ampDirty = true;
+  if (sweep.t >= SWEEP_GLIDE + SWEEP_HOLD) {
+    // Next distinct pitch (skip the partner of a degenerate pair).
+    let k = sweep.k + 1;
+    while (k < fr.length && fr[k]! / target < 1.004) k++;
+    if (k >= Math.min(fr.length, SWEEP_MODES)) k = 0;
+    sweep = { k, t: 0, from: target };
+  }
 }
 
 function enterSand(): void {
@@ -531,6 +573,7 @@ function stripAt(e: PointerEvent): void {
 }
 stripCanvas.addEventListener('pointerdown', (e) => {
   void audio.start();
+  if (mode === 'sand') setSweep(false);
   stripDrag = true;
   stripCanvas.setPointerCapture(e.pointerId);
   stripAt(e);
@@ -546,6 +589,14 @@ app.addEventListener('click', (e) => {
   else if (b.dataset.shape) { if (mode === 'draw' || mode === 'listen') setMode('play'); void load(b.dataset.shape); }
   else if (b.dataset.close !== undefined) (b.closest('dialog') as HTMLDialogElement).close();
   else if (b.dataset.act === 'about') aboutDlg.showModal();
+  else if (b.dataset.act === 'sweep') setSweep(!sweep);
+  else if (b.dataset.act === 'share') {
+    const label = b.querySelector('span')!;
+    const done = (t: string) => { label.textContent = t; setTimeout(() => { label.textContent = 'Share'; }, 2200); };
+    const showUrl = () => { hintEl.textContent = location.href; done('Share'); };
+    if (navigator.clipboard) navigator.clipboard.writeText(location.href).then(() => done('Link copied'), showUrl);
+    else showUrl();
+  }
   else if (b.dataset.act === 'modes') { fillGallery(); galleryDlg.showModal(); }
   else if (b.dataset.act === 'sound') { popEl.hidden = !popEl.hidden; b.setAttribute('aria-expanded', String(!popEl.hidden)); }
   else if (b.dataset.act === 'mute') {
@@ -589,6 +640,7 @@ window.addEventListener('keydown', (e) => {
   else if (k === 'd') setMode('draw');
   else if (k === 's') setMode('sand');
   else if (k === 'l') setMode('listen');
+  else if (k === 'w' && mode === 'sand') setSweep(!sweep);
   else if (k === 'm') { fillGallery(); galleryDlg.showModal(); }
   else if (k === 'a') aboutDlg.showModal();
   else if (k === 'h') { hideUi = !hideUi; for (const el of [cardEl, $('.dh-head'), $('.dh-bottom')]) (el as HTMLElement).style.visibility = hideUi ? 'hidden' : ''; }
@@ -642,6 +694,7 @@ function frame(now: number): void {
   lastT = now;
   const items: DrawItem[] = [];
   const rows: StripRow[] = [];
+  if (mode === 'sand') stepSweep(dt);
   const shown = mode === 'listen' ? [] : slots;
   for (let i = 0; i < shown.length; i++) {
     const s = shown[i]!;
@@ -653,8 +706,8 @@ function frame(now: number): void {
         s.ampDirty = false;
         if (i === 0) audio.send({ type: 'drive', freq: driveF, gain: 0.05 + 0.13 * s.level });
       }
-      const hop = Math.sqrt(s.live.data.area) * 0.035;
-      for (let sub = 0; sub < 3; sub++) s.sand.step(s.amp, s.level, hop);
+      const hop = Math.sqrt(s.live.data.area) * 0.045;
+      for (let sub = 0; sub < 4; sub++) s.sand.step(s.amp, s.level, hop);
       s.gl.setSand(stage.sandProg, s.sand.pos);
       items.push({ drum: s.gl, view: s.view, u: s.live.u, live: 0, plate: true, step: 1 });
     } else {
@@ -675,7 +728,12 @@ function frame(now: number): void {
   ink.clear();
   for (const s of shown) ink.rim(s.view, s.live.data.outline, mode === 'sand');
   if (mode === 'sand') for (const s of shown) ink.driver(s.view, s.drive[0], s.drive[1]);
-  if (shown.length === 2) shown.forEach((s, i) => ink.caption(s.view, i ? 'Twin B' : 'Twin A'));
+  if (shown.length === 2) {
+    shown.forEach((s, i) => {
+      ink.caption(s.view, i ? 'Twin B' : 'Twin A');
+      if (mode !== 'sand') ink.pieces(s.view, (i ? GWW.right : GWW.left).pieces.map((t) => scalePoly(t, GWW_SCALE)));
+    });
+  }
   ink.drawRipples(now);
   if (stroke && strokeView) ink.stroke(strokeView, stroke);
 
@@ -736,5 +794,6 @@ syncSliders();
 }
 layout();
 const startShape = params.get('shape');
-void load(startShape && (startShape === TWINS || PRESETS.some((p) => p.id === startShape)) ? startShape : 'circle').then(syncSliders);
+const startDrawn = params.get('d') ? decodeOutline(params.get('d')!) : null;
+void load(startDrawn ?? (startShape && (startShape === TWINS || PRESETS.some((p) => p.id === startShape)) ? startShape : 'circle')).then(syncSliders);
 requestAnimationFrame(frame);

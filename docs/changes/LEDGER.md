@@ -38,3 +38,4 @@
 | EOWC-CHG-20261127-003 | Drumhead scaffold and solver: meshing, linear FEM, RCM banded Cholesky, shift-invert Lanczos; tests against exact square, disc and Driscoll (1997) GWW values |
 | EOWC-CHG-20261127-004 | Drumhead app: solver worker pool, WebGL2 two-ink renderer, AudioWorklet modal synthesis, Chladni sand, spectrum strip, mode gallery, twins view, About text, phone layout |
 | EOWC-CHG-20261127-005 | Drumhead Listen game (which drum is this?, with twins rounds), solved-preset cache, production smoke test served from a subfolder |
+| EOWC-CHG-20261127-006 | Drumhead: sand sweep through the modes, share links for drawn drums, the twins seven triangles drawn faintly, synthetic room reverb |

@@ -316,3 +316,16 @@ dialog::backdrop { background: rgba(28, 25, 22, 0.25); }
   .dh-quiz-opt svg { width: 80px; height: 80px; }
   .dh-quiz-a { font-size: 15px; }
 }
+
+.dh-sweep {
+  position: absolute;
+  left: 18px;
+  top: 8px;
+  z-index: 2;
+  font-style: italic;
+  border: 1px solid var(--ink-3);
+  background: rgba(239, 232, 216, 0.85);
+  padding: 5px 12px;
+}
+.dh-sweep[hidden] { display: none; }
+.dh-sweep[aria-pressed="true"]::after { display: none; }
