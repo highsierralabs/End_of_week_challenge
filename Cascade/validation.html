@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="Cascade validation: how the toy air-shower Monte Carlo compares with Heitler-Matthews scalings, Greisen, and accelerator-tuned full simulations." />
+    <meta name="theme-color" content="#05070d" />
+    <title>Cascade - validation</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2305070d'/%3E%3Cpath d='M16 3 L16 13 M16 13 L9 24 M16 13 L23 24 M16 13 L14 29 M16 13 L19 29 M9 24 L6 29 M23 24 L27 29' stroke='%237dff7a' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
+  </head>
+  <body class="vx">
+    <header class="vx-top">
+      <a class="vx-brand" href="./index.html" aria-label="Cascade: back to the simulator">
+        <span class="vx-brand-mark" aria-hidden="true"></span>
+        <span class="vx-brand-name">Cascade</span>
+        <span class="vx-brand-sub">validation</span>
+      </a>
+      <a class="vx-back" href="./index.html"><span aria-hidden="true">&larr;</span> Back to the simulator</a>
+    </header>
+
+    <main class="vx-main">
+      <section class="vx-intro">
+        <p class="vx-kicker">Validation</p>
+        <h1>How good is this toy Monte Carlo?</h1>
+        <p class="vx-lede">
+          Cascade's hadronic physics is a small calibrated toy, not QGSJET, EPOS or SIBYLL. This page puts a fixed,
+          precomputed ensemble of vertical showers next to the analytic scalings it should follow and the full
+          simulations it imitates, and says plainly where it falls short. Nothing is simulated when the page loads:
+          every number comes from <code>src/data/validation.json</code>, written by
+          <code>scripts/precompute-validation.ts</code>.
+        </p>
+        <p class="vx-meta" id="vx-meta"></p>
+      </section>
+
+      <section class="vx-section" aria-labelledby="vx-score-h">
+        <h2 id="vx-score-h">Scorecard</h2>
+        <p class="vx-note">Computed from the data file when the page loads. "Near" means outside the reference range
+          but within two standard errors of its edge.</p>
+        <div class="vx-score" id="vx-score"></div>
+      </section>
+
+      <div class="vx-figs">
+        <figure class="vx-fig vx-fig--wide" id="fig-xmax">
+          <figcaption class="vx-fig-head">
+            <h2>Mean depth of maximum, X<sub>max</sub></h2>
+            <div class="vx-legend" data-legend></div>
+          </figcaption>
+          <div class="vx-plot vx-plot--tall" data-plot></div>
+          <div class="vx-fig-text" data-text></div>
+        </figure>
+
+        <figure class="vx-fig" id="fig-rms">
+          <figcaption class="vx-fig-head">
+            <h2>Shower-to-shower spread, &sigma;(X<sub>max</sub>)</h2>
+            <div class="vx-legend" data-legend></div>
+          </figcaption>
+          <div class="vx-plot" data-plot></div>
+          <div class="vx-fig-text" data-text></div>
+        </figure>
+
+        <figure class="vx-fig" id="fig-nmax">
+          <figcaption class="vx-fig-head">
+            <h2>Size at maximum, N<sub>max</sub></h2>
+            <div class="vx-legend" data-legend></div>
+          </figcaption>
+          <div class="vx-plot vx-plot--ratio" data-plot></div>
+          <div class="vx-fig-text" data-text></div>
+        </figure>
+
+        <figure class="vx-fig" id="fig-mu">
+          <figcaption class="vx-fig-head">
+            <h2>Muons at the ground, N<sub>&mu;</sub></h2>
+            <div class="vx-legend" data-legend></div>
+          </figcaption>
+          <div class="vx-plot vx-plot--ratio" data-plot></div>
+          <div class="vx-fig-text" data-text></div>
+        </figure>
+
+        <section class="vx-fig" id="vx-thin" aria-labelledby="vx-thin-h">
+          <div class="vx-fig-head"><h2 id="vx-thin-h">Does thinning bias the answer?</h2></div>
+          <div class="vx-fig-text" data-text></div>
+          <div class="vx-tablewrap" data-table></div>
+        </section>
+      </div>
+
+      <section class="vx-section" aria-labelledby="vx-table-h">
+        <h2 id="vx-table-h">All the numbers</h2>
+        <p class="vx-note">Means with their standard error; &sigma; is the sample standard deviation (N&minus;1) of the
+          per-shower values. Depths are slant depths in g/cm&sup2; the ground is at 861 g/cm&sup2;. Scroll sideways on a
+          narrow screen.</p>
+        <div class="vx-tablewrap" id="vx-table"></div>
+      </section>
+
+      <section class="vx-section vx-prose" aria-labelledby="vx-lim-h">
+        <h2 id="vx-lim-h">Honest limitations</h2>
+        <ul>
+          <li><b>Toy hadronic model, calibrated once.</b> Energy-dependent p&ndash;air and &pi;&ndash;air cross sections,
+            a UA5-style multiplicity scaled to an air target, leading-particle inelasticity and exponential p<sub>T</sub>.
+            Its one free multiplicity factor was tuned so that mean proton X<sub>max</sub> at 1&nbsp;PeV lands near
+            555&nbsp;g/cm&sup2;. Agreement at 1&nbsp;PeV is therefore by construction; agreement elsewhere, the
+            elongation rate, the fluctuations and the muon numbers are the actual tests.</li>
+          <li><b>Missing particle production.</b> No kaons, charm, baryon&ndash;antibaryon pairs, resonances or
+            diffraction. Only pions are produced, so muon numbers and their energy dependence carry model uncertainty
+            far larger than the statistical errors shown here.</li>
+          <li><b>No photonuclear interactions.</b> Photons only pair-produce and Compton-scatter, so a gamma-ray shower
+            here makes no hadrons and essentially no muons; real photon showers carry a few to ten per cent of the
+            hadronic muon number.</li>
+          <li><b>No LPM effect</b> and no photon pre-shower in the geomagnetic field. Both matter mainly above
+            ~10<sup>18</sup>&nbsp;eV, past the top of the photon ladder here, where real photon showers become deeper and
+            fluctuate far more than a Bethe&ndash;Heitler cascade.</li>
+          <li><b>Nuclei by semi-superposition.</b> Wounded nucleons interact; the spectator remnant breaks into one
+            fragment plus free nucleons. No nuclear-fragmentation data enter.</li>
+          <li><b>Flat atmosphere, flat ground.</b> Linsley's US-standard layers, no curvature, ground a plane at
+            1539&nbsp;m (861&nbsp;g/cm&sup2;). At the top of the ladder X<sub>max</sub> approaches the ground, so the
+            Gaisser&ndash;Hillas fit has little or no tail to work with.</li>
+          <li><b>No geomagnetic field</b>; it matters most for muons in inclined showers, which are not tested here.</li>
+          <li><b>Hillas thinning with a weight limit.</b> Profiles and ground counts are weighted samples. Weighted
+            counts are unbiased on average, but the thinning adds artificial fluctuations; the convergence check above
+            tests the bias at one energy only.</li>
+          <li><b>Gaisser&ndash;Hillas fits on thinned profiles add noise</b> to X<sub>max</sub> and N<sub>max</sub>,
+            which inflates &sigma;(X<sub>max</sub>) slightly. The charged profile counts e<sup>&plusmn;</sup> above
+            1&nbsp;MeV kinetic, muons and charged hadrons.</li>
+          <li><b>Small ensembles.</b> 12&ndash;24 showers per point: the mean is good to a few g/cm&sup2;, the spread
+            to roughly 15&ndash;20 per cent, and a single rare deep proton can move both.</li>
+          <li><b>Everything is deterministic by seed.</b> Rerunning the script reproduces the file exactly (except the
+            CPU times). That makes the comparison repeatable, not more accurate.</li>
+        </ul>
+      </section>
+
+      <section class="vx-section vx-prose" aria-labelledby="vx-ref-h">
+        <h2 id="vx-ref-h">References and method</h2>
+        <ul>
+          <li><b>Heitler&ndash;Matthews</b>: J. Matthews, Astropart. Phys. 22 (2005) 387. Proton
+            X<sub>max</sub> uses the code's approximate elongation form 470&nbsp;+&nbsp;58&nbsp;log<sub>10</sub>(E/PeV);
+            nuclei by superposition; photons X<sub>0</sub>&nbsp;ln(E/&xi;<sub>c</sub>) with X<sub>0</sub>&nbsp;=&nbsp;36.62&nbsp;g/cm&sup2;,
+            &xi;<sub>c</sub>&nbsp;=&nbsp;84.8&nbsp;MeV. Muons N<sub>&mu;</sub>&nbsp;=&nbsp;A<sup>0.15</sup>(E/20&nbsp;GeV)<sup>0.85</sup>.
+            These are scalings with uncertain normalisation, not predictions to a few per cent.</li>
+          <li><b>Greisen</b> electron number at the photon maximum, evaluated at the Heitler depth (code:
+            <code>greisen(E0, xmaxPhoton(E0))</code>). It counts all electrons; the Monte Carlo counts charged particles
+            above a 1&nbsp;MeV kinetic cut.</li>
+          <li><b>Model band</b>: mean X<sub>max</sub> of CORSIKA with EPOS-LHC, QGSJet-II-04 and Sibyll&nbsp;2.3, approximate
+            values digitised from published reviews (e.g. K.-H. Kampert &amp; M. Unger, Astropart. Phys. 35 (2012) 660;
+            Pierre Auger Collaboration X<sub>max</sub> papers), <em>for orientation only</em>. The reference widths
+            &sigma;(X<sub>max</sub>) &asymp; 60&ndash;70&nbsp;g/cm&sup2; (p) and 20&ndash;25&nbsp;g/cm&sup2; (Fe) are typical
+            full-simulation values from the same sources.</li>
+          <li id="vx-method"></li>
+        </ul>
+      </section>
+    </main>
+
+    <footer class="vx-foot">
+      <a href="./index.html"><span aria-hidden="true">&larr;</span> Back to the simulator</a>
+      <span>Data: <code>src/data/validation.json</code></span>
+    </footer>
+    <noscript><p class="vx-main">The charts and tables on this page need JavaScript.</p></noscript>
+    <script type="module" src="./src/app/validation.ts"></script>
+  </body>
+</html>

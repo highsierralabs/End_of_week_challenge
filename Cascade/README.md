@@ -49,15 +49,19 @@ The atmosphere is Linsley's parameterisation of the US Standard Atmosphere, as u
 
 The full model, its approximations and its limits are in [docs/physics.md](docs/physics.md).
 
-How close does a toy get? After calibrating two parameters, the mean depth of shower maximum is:
+How close does a toy get? After calibrating two parameters, the mean depth of shower maximum from the validation
+ensemble (24 showers each) is:
 
 | Primary at 1 PeV | Simulated Xmax | Expected (accelerator-tuned models) |
 |---|---|---|
-| Proton | 557 g/cm² | about 555 g/cm² |
-| Iron | 464 g/cm² | 90-100 g/cm² shallower than proton |
+| Proton | 571 ± 12 g/cm² | 540-575 g/cm² |
+| Iron | 474 ± 5 g/cm² | 440-470 g/cm² |
 
-The spread is realistic for both. A 1 PeV photon shower reaches within 4% of Greisen's size at maximum. The
-[validation page](validation.html) shows the rest, including where the model departs from the reference band.
+The ranges are approximate published full-simulation values. Photon showers reach 91-97% of Greisen's size at
+maximum, and the muon number grows as E^0.92, at the top of the 0.85-0.93 reference range. The model also misses in
+places: proton Xmax sits 13-35 g/cm² above the reference band at 3 of 5 energies, the iron elongation rate is about
+5 g/cm² per decade low, and the Xmax spread drifts away from the full simulations at the extremes. The
+[validation page](validation.html) scores every one of these.
 
 ## Cascade and the RHACO observatory
 

@@ -11,3 +11,5 @@
 | EOWC-CHG-20261126-007 | Rate mode, Observatory comparison with the RHACO snapshot, physics doc, licence, Pages workflow |
 | EOWC-CHG-20261126-008 | Visual tuning: camera presets, EM brightness, bloom, portrait framing, presentation mode, tour text fix |
 | EOWC-CHG-20261126-009 | Per-shower detector exposure line; READMEs and screenshots |
+| EOWC-CHG-20261126-010 | Validation page with precomputed 348-shower ensemble; README cites its numbers |
+| EOWC-CHG-20261126-011 | Replay sonification (S key) |
