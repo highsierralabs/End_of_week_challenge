@@ -239,6 +239,17 @@ export function createControls(el: HTMLElement, initial: ShowerParams, hd: Contr
   const runFill = h('span', { class: 'cx-run-fill', 'aria-hidden': 'true' });
   const runBtn = h('button', { type: 'button', class: 'cx-run' }, runFill, runLabel);
   runBtn.addEventListener('click', run);
+  // Sticky footer: the bar pins to the bottom of the scrolling panel. While pinned it gets an
+  // opaque background and a top fade (.is-stuck), so the content scrolling underneath never shows through.
+  const runBar = h('div', { class: 'cx-run-bar' }, runBtn);
+  const runSentinel = h('div', { class: 'cx-run-sentinel', 'aria-hidden': 'true' });
+  if (typeof IntersectionObserver !== 'undefined') {
+    new IntersectionObserver(([e]) => {
+      if (!e) return;
+      const rb = e.rootBounds;
+      runBar.classList.toggle('is-stuck', !e.isIntersecting && rb !== null && e.boundingClientRect.top >= rb.bottom - 1);
+    }, { root: el, threshold: 0 }).observe(runSentinel);
+  }
 
   // ---- display: classes
   const classRow = h('div', { class: 'cx-chips', role: 'group', 'aria-label': 'Particle classes shown' });
@@ -302,7 +313,8 @@ export function createControls(el: HTMLElement, initial: ShowerParams, hd: Contr
     ),
     h('div', { class: 'cx-field' }, h('label', { for: tId, class: 'cx-label', text: 'Thinning' }), thinSelect, thinNote),
     advanced,
-    runBtn,
+    runBar,
+    runSentinel,
     h('hr', { class: 'cx-rule' }),
     group('Particles', classRow),
     group('Camera', camRow),

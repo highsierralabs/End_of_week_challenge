@@ -682,7 +682,9 @@ function thinningCheck(): void {
     const a = r[k], b = ref[k];
     if (a && b && b.mean > 0) maxRel = Math.max(maxRel, Math.abs(a.mean / b.mean - 1));
   }
-  box.querySelector<HTMLElement>('[data-table]')!.append(t);
+  const wrap = box.querySelector<HTMLElement>('[data-table]')!;
+  wrap.append(t);
+  scrollAffordance(wrap);
   box.querySelector<HTMLElement>('[data-text]')!.innerHTML =
     `<p>${ref.n} ${PRIM[ref.primary].label} showers at ${eLabel(ref.lgE)} eV with the same seeds at ${rows.length} thinning levels ` +
     `ε (the random streams part at the first thinning decision, so these are statistically independent samples, not the same ` +
@@ -783,7 +785,7 @@ function primChip(p: Prim): string {
 
 function bigTable(): void {
   const host = document.getElementById('vx-table')!;
-  const t = el('table', 'vx-table');
+  const t = el('table', 'vx-table vx-table--dense');
   const head = ['Primary', 'E<small>eV</small>', 'N', 'ε<small>thinning</small>', '⟨X₁⟩<small>g/cm²</small>', '⟨Xmax⟩<small>± s.e.</small>',
     'σ(Xmax)', 'median<small>Xmax</small>', 'model band<small>approx.</small>', 'H–M<small>Xmax</small>', '⟨Nmax⟩', 'ref Nmax<small>Greisen / E÷1.4 GeV</small>',
     'ratio', '⟨Nμ⟩<small>ground</small>', 'Matthews<small>Nμ</small>', '⟨Ne±⟩<small>ground</small>', 's / shower', 'GH fails'];
@@ -800,7 +802,7 @@ function bigTable(): void {
         `<td>${eLabel(c.lgE)}</td><td>${c.n}</td><td>${sci(c.thinning, 1)}</td>` +
         `<td>${x1 ? fx(x1.mean, 0) : '—'}</td>` +
         `<td>${x ? `${fx(x.mean, 1)} ± ${fx(x.sem, 1)}` : '—'}</td><td>${x ? fx(x.rms, 1) : '—'}</td><td>${x ? fx(x.median, 1) : '—'}</td>` +
-        `<td class="${bs ? `vx-flag-${bs}` : 'vx-muted'}">${b ? `${b[0]}–${b[1]}${bs && bs !== 'ok' ? ` (${STATUS_TEXT[bs]})` : ''}` : '—'}</td>` +
+        `<td class="${bs ? `vx-flag-${bs}` : 'vx-muted'}">${b ? `${b[0]}–${b[1]}${bs && bs !== 'ok' ? `<small>${STATUS_TEXT[bs]}</small>` : ''}` : '—'}</td>` +
         `<td class="vx-muted">${fx(hmXmax(p, c.lgE), 0)}</td>` +
         `<td>${nm ? sci3(nm.mean) : '—'}</td><td class="vx-muted">${sci3(ref)}</td><td>${nm ? fx(nm.mean / ref, 2) : '—'}</td>` +
         `<td>${mu ? (mu.mean > 0 ? sci3(mu.mean) : '0') : '—'}</td><td class="vx-muted">${p === 'gamma' ? '—' : sci3(muRef(p, c.lgE))}</td>` +
@@ -809,12 +811,32 @@ function bigTable(): void {
   }
   t.innerHTML = `<thead><tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${body}</tbody>`;
   host.append(t);
+  scrollAffordance(host);
   for (const chip of t.querySelectorAll<HTMLElement>('[data-prim]')) {
     const p = chip.dataset.prim as Prim;
     const sw = keySwatch({ marker: PRIM[p].marker, color: PRIM[p].color }, 12, 12);
     chip.append(sw);
     if (!('quiet' in chip.dataset)) chip.append(PRIM[p].label);
   }
+}
+
+/**
+ * A horizontally scrolling table gets a right-edge fade and a 'scroll' hint while more columns
+ * are hidden to the right; both vanish at the end of the scroll or when everything fits.
+ */
+function scrollAffordance(wrap: HTMLElement): void {
+  const box = el('div', 'vx-tablebox');
+  wrap.replaceWith(box);
+  const fade = el('div', 'vx-fade', 'scroll ›');
+  fade.setAttribute('aria-hidden', 'true');
+  box.append(wrap, fade);
+  const update = (): void => {
+    const more = wrap.scrollWidth - wrap.clientWidth - wrap.scrollLeft > 2;
+    box.classList.toggle('has-more', more);
+  };
+  wrap.addEventListener('scroll', update, { passive: true });
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(update).observe(wrap);
+  requestAnimationFrame(update);
 }
 
 // ------------------------------------------------------------------ meta

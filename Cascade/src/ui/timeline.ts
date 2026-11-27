@@ -83,7 +83,8 @@ export function createTimeline(el: HTMLElement, hd: TimelineHandlers): Timeline 
       playBtn.classList.toggle('is-playing', s.playing);
     }
     const t = s.tNs;
-    clockT.textContent = `t = ${timeNs(Math.abs(t))}`;
+    // Signed clock: t < 0 before the first interaction, so the number runs monotonically.
+    clockT.textContent = `t = ${fmtSigned(t)}`;
     clockSub.textContent = !Number.isFinite(t) ? 'no replay loaded' : t < 0 ? 'before first interaction' : 'after first interaction';
     if (!dragging && range > 0 && Number.isFinite(t)) scrub.value = String(Math.round(clamp((t - s.tMinNs) / range, 0, 1) * SCRUB_STEPS));
     scrub.disabled = !(range > 0);

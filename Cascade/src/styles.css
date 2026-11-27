@@ -346,10 +346,32 @@ button { cursor: pointer; }
 .cx-btn--primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .cx-btn--primary:hover { background: #bcc8ff; border-color: #bcc8ff; }
 
-.cx-run {
+/* Sticky Simulate footer. Chrome deflates the sticky rectangle by the scroller's padding, so
+   bottom = -(panel bottom padding) puts the bar flush with the panel edge; the bar's own
+   bottom padding restores the spacing. */
+.cx-run-bar {
+  --bar-pad: 14px;
+  --bar-bg: #0b0f1b;
   position: sticky;
-  bottom: 0;
-  z-index: 2;
+  bottom: calc(-1 * var(--bar-pad));
+  z-index: 3;
+  margin: 0 -14px;
+  padding: 2px 14px var(--bar-pad);
+}
+.cx-run-bar .cx-run { width: 100%; }
+.cx-run-bar.is-stuck { background: var(--bar-bg); }
+.cx-run-bar.is-stuck::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 100%;
+  height: 18px;
+  background: linear-gradient(to bottom, rgba(11, 15, 27, 0), var(--bar-bg));
+  pointer-events: none;
+}
+.cx-run-sentinel { height: 1px; margin-top: -13px; }
+.cx-run {
+  position: relative;
   overflow: hidden;
   height: 44px;
   border: 1px solid rgba(190, 202, 255, 0.7);
@@ -375,9 +397,10 @@ button { cursor: pointer; }
   background: linear-gradient(90deg, rgba(167, 182, 255, 0.3), rgba(167, 182, 255, 0.55));
   transition: transform 0.2s linear;
 }
+.cx-run:not(.is-busy) .cx-run-fill { transition: none; }
 .cx-run.is-busy {
   cursor: progress;
-  background: rgba(10, 14, 30, 0.85);
+  background: #0d1226;
   color: var(--text);
   border-color: rgba(167, 182, 255, 0.45);
   box-shadow: none;
@@ -492,11 +515,11 @@ button { cursor: pointer; }
 .cx-play .cx-icon { width: 20px; height: 20px; }
 .cx-play:hover { background: rgba(167, 182, 255, 0.22); }
 .cx-play.is-playing { background: var(--accent); color: var(--accent-ink); }
-.cx-clock { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; line-height: 1.2; }
+.cx-clock { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; line-height: 1.2; overflow: hidden; }
 .cx-clock-t { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 17px; color: #fff; letter-spacing: 0.01em; white-space: nowrap; }
-.cx-clock-sub { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.cx-clock-sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cx-speed-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: none; }
-.cx-speed { width: 112px; height: 28px; font-family: var(--mono); font-size: 12px; }
+.cx-speed { width: auto; min-width: 112px; height: 28px; font-family: var(--mono); font-size: 12px; padding-right: 28px; }
 .cx-speed-hint { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
 .cx-tl-row--scrub { gap: 10px; }
 .cx-scrub-wrap { position: relative; flex: 1 1 auto; min-width: 0; padding-top: 10px; }
@@ -520,6 +543,8 @@ button { cursor: pointer; }
 /* ------------------------------------------------------------------ charts */
 
 .cx-charts { display: flex; flex-direction: column; gap: 8px; }
+/* Inside a height-limited scrolling panel, flex items must not shrink (the legend would overlap the caption). */
+.cx-charts > * { flex: none; }
 .cx-ctabs { display: flex; gap: 2px; border-bottom: 1px solid var(--hair); margin: -4px -2px 0; }
 .cx-ctab {
   flex: 1 1 0;
@@ -573,15 +598,19 @@ button { cursor: pointer; }
 
 /* ------------------------------------------------------------------ tour */
 
+/* Desktop: a compact card in the lower-left corner of the 3D area, just right of the Shower
+   column and above the timeline, so the centre of the view (shower axis, detector) stays clear.
+   --cx-left-w and --cx-tl-h are measured by buildLayout. */
 .cx-tour {
   position: absolute;
-  left: 50%;
-  bottom: 130px;
-  width: min(560px, calc(100vw - 32px));
-  max-height: min(56vh, 480px);
+  left: calc(var(--cx-left-w, 312px) + 2 * var(--gap));
+  bottom: calc(var(--cx-tl-h, 110px) + 2 * var(--gap));
+  width: min(380px, calc(50vw - var(--cx-left-w, 312px)));
+  min-width: 300px;
+  max-height: min(48vh, 420px);
   display: flex;
   flex-direction: column;
-  transform: translate(-50%, 8px);
+  transform: translateY(8px);
   opacity: 0;
   transition: opacity 0.2s ease, transform 0.2s ease;
   background: var(--panel-solid);
@@ -591,24 +620,25 @@ button { cursor: pointer; }
   -webkit-backdrop-filter: blur(18px) saturate(1.3);
   backdrop-filter: blur(18px) saturate(1.3);
 }
-.cx-tour.is-in { opacity: 1; transform: translate(-50%, 0); }
-.cx-tour-head { display: flex; align-items: center; gap: 10px; padding: 10px 10px 0 18px; }
+.cx-tour.is-in { opacity: 1; transform: none; }
+.cx-tour-head { display: flex; align-items: center; gap: 10px; padding: 8px 8px 0 16px; }
 .cx-tour-kicker { font-size: 10.5px; font-weight: 650; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
 .cx-tour-count { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-right: auto; }
-.cx-tour-title { margin: 4px 18px 0; font-size: 17px; font-weight: 650; letter-spacing: 0.005em; }
-.cx-tour-body { padding: 4px 18px 6px; overflow-y: auto; font-size: 13.5px; line-height: 1.55; color: var(--text-2); min-height: 0; }
+.cx-tour-title { margin: 2px 16px 0; font-size: 15.5px; font-weight: 650; letter-spacing: 0.005em; }
+.cx-tour-body { padding: 2px 16px 6px; overflow-y: auto; font-size: 13px; line-height: 1.5; color: var(--text-2); min-height: 0; overscroll-behavior: contain; }
 .cx-tour-body p { margin: 8px 0; }
 .cx-tour-body ul { margin: 6px 0; padding-left: 18px; }
 .cx-tour-body li { margin: 3px 0; }
 .cx-tour-body sub, .cx-tour-body sup, .cx-about-body sub, .cx-about-body sup { line-height: 0; font-size: 0.75em; }
 .cx-tour-body b, .cx-tour-body em { color: var(--text); font-style: normal; }
 .cx-tour-body em { color: #cdd5ff; }
-.cx-tour-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px 14px 18px; border-top: 1px solid var(--hair); }
+.cx-tour-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px 10px 16px; border-top: 1px solid var(--hair); flex: none; }
 .cx-tour-dots { display: flex; gap: 5px; flex-wrap: wrap; }
 .cx-tour-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(170, 190, 230, 0.25); }
 .cx-tour-dot.is-on { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
 .cx-tour-nav { display: flex; gap: 8px; }
-.cx-tour-nav .cx-btn { min-width: 76px; height: 34px; }
+.cx-tour-nav .cx-btn { min-width: 68px; height: 32px; }
+.cx-tour-head, .cx-tour-title { flex: none; }
 
 /* ------------------------------------------------------------------ about */
 
@@ -639,10 +669,11 @@ button { cursor: pointer; }
 
 /* ------------------------------------------------------------------ toast */
 
+/* Desktop: under the Readout panel (its height is measured into --cx-top-h), clear of the tour card. */
 .cx-toasts {
   position: absolute;
   z-index: 50;
-  top: 16px;
+  top: calc(var(--cx-top-h, 0px) + 2 * var(--gap));
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -650,7 +681,7 @@ button { cursor: pointer; }
   align-items: center;
   gap: 6px;
   pointer-events: none;
-  width: min(520px, calc(100vw - 32px));
+  width: min(460px, calc(100vw - 32px));
 }
 .cx-toast {
   padding: 8px 14px;
@@ -665,6 +696,10 @@ button { cursor: pointer; }
   transition: opacity 0.25s ease, transform 0.25s ease;
 }
 .cx-toast.is-in { opacity: 1; transform: none; }
+/* Desktop with the tour open: the card holds the lower-left of the 3D area, so toasts move to its right edge. */
+@media (min-width: 761px) {
+  .cx-root[data-tour] .cx-toasts { left: auto; right: calc(var(--cx-right-w, 452px) + 2 * var(--gap)); transform: none; align-items: flex-end; width: min(360px, 30vw); }
+}
 
 /* ------------------------------------------------------------------ tab bar (phone only) */
 
@@ -721,8 +756,12 @@ button { cursor: pointer; }
   .cx-timeline-body { padding: 8px 10px 6px; }
   .cx-play { width: 44px; height: 44px; }
   .cx-clock-t { font-size: 16px; }
-  .cx-speed { width: 104px; height: 32px; }
+  .cx-speed { width: auto; min-width: 118px; height: 34px; font-size: 15px; }
   .cx-span { display: none; }
+  .cx-ctoolbar { flex-wrap: wrap; row-gap: 4px; }
+  /* a reserved line for the hover readout: full text, no layout shift while touching the chart */
+  .cx-creadout { flex: 1 1 100%; min-height: 1.45em; text-align: left; white-space: normal; font-size: 11.5px; }
+  .cx-st-s { white-space: normal; overflow: visible; }
 
   .cx-seg-btn { min-height: 38px; }
   .cx-seg--primary .cx-seg-btn { min-height: 46px; }
@@ -781,19 +820,33 @@ button { cursor: pointer; }
   }
   .cx-tab:focus-visible { outline-offset: -4px; }
 
+  /* compact card docked above the timeline, so the 3D view above stays visible */
   .cx-tour {
     left: 8px; right: 8px;
     width: auto;
-    top: max(44px, env(safe-area-inset-top, 0px));
-    bottom: auto;
-    max-height: 46vh;
-    transform: translateY(-8px);
+    top: auto;
+    bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + var(--cx-tl-h, 120px) + 16px);
+    max-height: min(36vh, 330px);
+    border-radius: 12px;
+    transform: translateY(8px);
   }
   .cx-tour.is-in { transform: none; }
-  .cx-tour-body { font-size: 14px; }
+  .cx-tour-head { padding: 6px 6px 0 14px; }
+  .cx-tour-head .cx-btn--icon { width: 34px; height: 34px; }
+  .cx-tour-title { margin: 0 14px; font-size: 15.5px; }
+  .cx-tour-body { padding: 2px 14px 4px; font-size: 14px; line-height: 1.5; }
+  .cx-tour-body p { margin: 6px 0; }
+  .cx-tour-foot { padding: 6px 8px 8px 14px; }
+  .cx-tour-nav .cx-btn { height: 36px; min-width: 70px; }
+  .cx-tour-dots { gap: 4px; }
+  .cx-tour-dot { width: 5px; height: 5px; }
+  /* a drawer opened during the tour takes the bottom; the card steps aside until it closes */
+  .cx-root[data-drawer="controls"] .cx-tour,
+  .cx-root[data-drawer="charts"] .cx-tour,
+  .cx-root[data-drawer="stats"] .cx-tour { display: none; }
   .cx-about { width: calc(100vw - 16px); max-height: 90dvh; }
   .cx-about-body { padding: 4px 18px 20px; }
-  .cx-toasts { top: 44px; }
+  .cx-toasts { top: 52px; width: calc(100vw - 32px); }
 }
 
 @keyframes cx-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }

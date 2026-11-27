@@ -11,7 +11,7 @@ import { h } from './dom';
 import { compass, metres, si, timeNs } from './format';
 import {
   Axis, clipTo, decadeCeil, decadeFloor, drawAxes, drawPow10, drawSeries, haloText, INK, linearTicks, logTicks, MONO,
-  niceStep, SANS, Surface, type Rect,
+  niceStep, SANS, Surface, tagText, type Rect,
 } from './plot';
 
 export type ChartTab = 'profile' | 'lateral' | 'footprint' | 'timing';
@@ -33,7 +33,7 @@ const TABS: { id: ChartTab; label: string; caption: string }[] = [
   },
   {
     id: 'timing', label: 'Timing',
-    caption: 'Arrival delay behind a flat front moving at c through the core, each class normalised to unit area. Muons lead; electrons and photons scatter, take longer paths and trail behind: this spread is the thickness of the shower front.',
+    caption: 'Arrival delay behind a flat front moving at c through the core, for particles in one ring of core distance (measured in the shower plane, as in the lateral chart); each class normalised to unit area. At a given distance from the core muons arrive first, and electrons and photons trail with a long tail; the spread grows with distance. Pooled over all distances, muons look later only because they spread farther out, where the front is more curved.',
   },
 ];
 
@@ -50,10 +50,13 @@ const LAT_PER_DECADE = 5;
 const LAT_KMAX = 24; // 1 m .. ~63 km
 const FOOT_N = 120;
 const TIME_BINS = 72;
+/** Minimum ground records for a class to be drawn in the timing chart. */
+const TIME_MIN_RECORDS = 30;
+const TIME_MIN_HADRON = 300;
 
 type FootExtent = 'auto' | 50 | 200 | 1000 | 5000;
 type FootFilter = 'all' | 'g' | 'e' | 'm' | 'h';
-type RadialFilter = 'all' | '0-50' | '50-200' | '200-1000' | '1000+';
+type RadialFilter = 'all' | '0-50' | '50-300' | '300-1000';
 
 interface Derived {
   r: ShowerResult;
@@ -75,7 +78,7 @@ interface Derived {
   timeOrder: Uint32Array | null;
 }
 
-interface TimingHist { lo: number; hi: number; bw: number; hist: Float64Array[]; total: number[]; inRange: number[]; median: number[] }
+interface TimingHist { lo: number; hi: number; bw: number; hist: Float64Array[]; total: number[]; inRange: number[]; median: number[]; count: number[] }
 
 export class ChartsPanel {
   private readonly el: HTMLElement;
@@ -98,7 +101,7 @@ export class ChartsPanel {
   private footFollow = false;
   private foot = { key: '', grid: new Float64Array(FOOT_N * FOOT_N), ptr: 0, tLast: -Infinity };
   private footMaxCache: { key: string; d: Derived | null; max: number } = { key: '', d: null, max: 0 };
-  private radial: RadialFilter = 'all';
+  private radial: RadialFilter = '50-300';
   private timingCache: { key: string; th: TimingHist | null } = { key: '', th: null };
 
   constructor(el: HTMLElement) {
@@ -201,7 +204,7 @@ export class ChartsPanel {
       this.options.append(ext, fil, follow);
     } else if (this.tab === 'timing') {
       const rad = select('Core distance', [
-        ['all', 'all r'], ['0-50', 'r < 50 m'], ['50-200', '50–200 m'], ['200-1000', '200 m–1 km'], ['1000+', 'r > 1 km'],
+        ['0-50', 'r 0–50 m'], ['50-300', 'r 50–300 m'], ['300-1000', 'r 300–1000 m'], ['all', 'all distances'],
       ], this.radial, (v) => { this.radial = v as RadialFilter; this.draw(); });
       this.options.append(rad);
     } else {
@@ -364,11 +367,11 @@ export class ChartsPanel {
     const xFirst = st.firstInteractionDepth;
     if (Number.isFinite(xFirst) && xFirst >= 0 && xFirst <= xMax) {
       const px = vline(xFirst, 'rgba(220, 228, 245, 0.55)', [2, 3]);
-      haloText(ctx, `X₁ ${xFirst.toFixed(0)}`, px + 4, frame.y + 13, INK.text);
+      tagText(ctx, `X₁ ${xFirst.toFixed(0)}`, px + 5, frame.y + 14, INK.text, 'left', frame.x + frame.w);
     }
     if (gh && Number.isFinite(gh.xmax) && gh.xmax > 0 && gh.xmax <= xMax) {
       const px = vline(gh.xmax, ACCENT.css, [4, 3]);
-      haloText(ctx, `Xmax ${gh.xmax.toFixed(0)}`, px + 4, frame.y + 27, ACCENT.css);
+      tagText(ctx, `Xmax ${gh.xmax.toFixed(0)}`, px + 5, frame.y + 31, ACCENT.css, 'left', frame.x + frame.w);
     }
     {
       const px = vline(ground, 'rgba(230, 200, 150, 0.8)', []);
@@ -871,7 +874,7 @@ export class ChartsPanel {
     }
     const th = this.timingHist(d);
     if (!th) {
-      this.setEmpty('No ground particles in this core-distance range.');
+      this.setEmpty(`No ground particles in the ${radialLabel(this.radial)}. Try another ring.`);
       this.legend.replaceChildren();
       return;
     }
@@ -879,14 +882,17 @@ export class ChartsPanel {
     const frame: Rect = { x: 56, y: 14, w: s.w - 56 - 14, h: s.h - 14 - 42 };
     let maxY = 0;
     const present: number[] = [];
+    const sparse: string[] = [];
     for (let g = 0; g < GROUPS.length; g++) {
       if (!(th.total[g]! > 0)) continue;
+      // a handful of heavily weighted records makes a spiky, misleading histogram
+      if (th.count[g]! < (g === 3 ? TIME_MIN_HADRON : TIME_MIN_RECORDS)) { sparse.push(`${GROUPS[g]!.label} (${th.count[g]} records)`); continue; }
       present.push(g);
       const hist = th.hist[g]!;
       for (let b = 0; b < TIME_BINS; b++) maxY = Math.max(maxY, hist[b]! / (th.total[g]! * th.bw));
     }
     if (!(maxY > 0)) {
-      this.setEmpty('No ground particles in this core-distance range.');
+      this.setEmpty(sparse.length ? `Too few ground records in the ${radialLabel(this.radial)} to plot (${sparse.join(', ')}).` : `No ground particles in the ${radialLabel(this.radial)}. Try another ring.`);
       this.legend.replaceChildren();
       return;
     }
@@ -944,16 +950,30 @@ export class ChartsPanel {
         ctx.stroke();
         ctx.restore();
         const right = px < frame.x + frame.w - 120;
-        haloText(ctx, 'clock at detector', right ? px + 4 : px - 4, frame.y + 13, '#ffe2a8', `10.5px ${MONO}`, right ? 'left' : 'right');
+        haloText(ctx, 'clock at detector', right ? px + 4 : px - 4, frame.y + frame.h - 8, '#ffe2a8', `10.5px ${MONO}`, right ? 'left' : 'right');
       }
     }
+
+    // which ring this is
+    tagText(ctx, radialLabel(this.radial), frame.x + frame.w - 6, frame.y + 15, INK.text, 'right');
 
     const outside = present.reduce((a, g) => a + (th.total[g]! - th.inRange[g]!), 0);
     const all = present.reduce((a, g) => a + th.total[g]!, 0);
     const frac = all > 0 ? outside / all : 0;
+    // State a muon lead only when both medians exist and the muon one is the smaller.
+    const notes: string[] = [];
+    const mMu = th.median[2]!;
+    const mE = th.median[1]!;
+    if (this.radial !== 'all' && present.includes(1) && present.includes(2) && Number.isFinite(mMu) && Number.isFinite(mE)) {
+      if (mMu < mE) notes.push(`in this ring muons lead e± by ${timeNs(mE - mMu, 2)} (medians)`);
+      else notes.push('in this ring the muon median is not earlier than the e± median (few particles?)');
+    }
+    if (this.radial === 'all') notes.push('pooled rings mix fronts of different curvature; pick a ring to compare arrival order');
+    if (sparse.length) notes.push(`too few to plot: ${sparse.join(', ')}`);
+    if (frac > 0.005) notes.push(`${(frac * 100).toFixed(1)}% outside the plotted range`);
     this.setLegend(
       present.map((g) => ({ color: GROUPS[g]!.color, label: `${GROUPS[g]!.label} median ${timeNs(th.median[g]!, 2)}` })),
-      frac > 0.005 ? `${(frac * 100).toFixed(1)}% outside the plotted range` : undefined,
+      notes.length ? notes.join(' · ') : undefined,
     );
     this.hover = (hx, hy) => {
       if (hx < frame.x || hx > frame.x + frame.w || hy < frame.y || hy > frame.y + frame.h) return null;
@@ -966,20 +986,31 @@ export class ChartsPanel {
     if (this.timingCache.key === key) return this.timingCache.th;
     const [rLo, rHi] = radialRange(this.radial);
     const g = d.r.ground;
-    // range from a strided sample of the selected particles
-    const stride = Math.max(1, Math.floor(d.n / 40000));
-    const sample: number[] = [];
-    for (let i = 0; i < d.n; i += stride) {
+    // the particles in this ring
+    const idx: number[] = [];
+    for (let i = 0; i < d.n; i++) {
       const rr = d.rPerp[i]!;
-      const dl = d.delay[i]!;
-      if (rr >= rLo && rr < rHi && Number.isFinite(dl)) sample.push(dl);
+      if (rr >= rLo && rr < rHi && Number.isFinite(d.delay[i]!)) idx.push(i);
+    }
+    // plotted range from weighted quantiles of (up to 40k of) them: thinned records carry very
+    // different weights, and the late, low-energy ones carry the most
+    const stride = Math.max(1, Math.floor(idx.length / 40000));
+    const sample: [number, number][] = [];
+    for (let k = 0; k < idx.length; k += stride) {
+      const i = idx[k]!;
+      sample.push([d.delay[i]!, g[i * GND_STRIDE + GND.W]!]);
     }
     let th: TimingHist | null = null;
     if (sample.length > 0) {
-      sample.sort((a, b) => a - b);
-      const q = (f: number): number => sample[Math.min(sample.length - 1, Math.max(0, Math.floor(f * (sample.length - 1))))]!;
+      sample.sort((a, b) => a[0] - b[0]);
+      const wsum = sample.reduce((a, s) => a + s[1], 0);
+      const q = (f: number): number => {
+        let acc = 0;
+        for (const s of sample) { acc += s[1]; if (acc >= f * wsum) return s[0]; }
+        return sample[sample.length - 1]![0];
+      };
       let lo = Math.min(q(0.002), 0);
-      let hi = q(0.95);
+      let hi = q(0.97);
       lo = Math.max(lo, -50);
       if (!(hi > lo + 5)) hi = lo + 5;
       const step = niceStep(hi - lo, 6);
@@ -990,15 +1021,14 @@ export class ChartsPanel {
       const total = GROUPS.map(() => 0);
       const inRange = GROUPS.map(() => 0);
       const under = GROUPS.map(() => 0);
-      for (let i = 0; i < d.n; i++) {
-        const rr = d.rPerp[i]!;
-        if (!(rr >= rLo && rr < rHi)) continue;
+      const count = GROUPS.map(() => 0);
+      for (const i of idx) {
         const dl = d.delay[i]!;
-        if (!Number.isFinite(dl)) continue;
         const o = i * GND_STRIDE;
         const grp = GROUP_OF_CLASS[g[o + GND.CLASS]!] ?? 3;
         const w = g[o + GND.W]!;
         total[grp]! += w;
+        count[grp]! += 1;
         const b = Math.floor((dl - lo) / bw);
         if (b < 0) under[grp]! += w;
         else if (b < TIME_BINS) { hist[grp]![b]! += w; inRange[grp]! += w; }
@@ -1014,7 +1044,7 @@ export class ChartsPanel {
         }
         return hi;
       });
-      th = { lo, hi, bw, hist, total, inRange, median };
+      th = { lo, hi, bw, hist, total, inRange, median, count };
       if (!total.some((t) => t > 0)) th = null;
     }
     this.timingCache = { key, th };
@@ -1079,11 +1109,14 @@ function latEdges(): number[] {
 function radialRange(f: RadialFilter): [number, number] {
   switch (f) {
     case '0-50': return [0, 50];
-    case '50-200': return [50, 200];
-    case '200-1000': return [200, 1000];
-    case '1000+': return [1000, Infinity];
+    case '50-300': return [50, 300];
+    case '300-1000': return [300, 1000];
     default: return [0, Infinity];
   }
+}
+
+function radialLabel(f: RadialFilter): string {
+  return f === 'all' ? 'all core distances (pooled)' : `ring r = ${f.replace('-', '–')} m from the axis`;
 }
 
 /** Half-width that frames the bulk of the particles and the detector. */

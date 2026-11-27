@@ -127,10 +127,34 @@ export function buildLayout(root: HTMLElement): Layout {
     if (e.key === 'Escape' && phone.matches && root.dataset.drawer) showPanel(null);
   });
 
+  // The tour announces itself with a bubbling 'cx:tour' event: on a phone an open drawer would hide
+  // the 3D changes the tour is pointing at, so opening the tour closes it.
+  root.addEventListener('cx:tour', (e) => {
+    const open = (e as CustomEvent<{ open: boolean }>).detail?.open === true;
+    root.toggleAttribute('data-tour', open);
+    if (open && phone.matches) showPanel(null);
+  });
+
+  // Measured geometry for overlay placement (tour card, toasts): left column width, timeline
+  // height, and the bottom edge of the top-centre Readout panel.
+  const measure = (): void => {
+    const rr = root.getBoundingClientRect();
+    root.style.setProperty('--cx-left-w', `${Math.round(leftCol.getBoundingClientRect().width)}px`);
+    root.style.setProperty('--cx-right-w', `${Math.round(rightCol.getBoundingClientRect().width)}px`);
+    root.style.setProperty('--cx-tl-h', `${Math.round(timelineWrap.getBoundingClientRect().height)}px`);
+    const sb = panels.stats.section.getBoundingClientRect();
+    root.style.setProperty('--cx-top-h', `${Math.max(0, Math.round(sb.bottom - rr.top - 12))}px`);
+  };
+  if (typeof ResizeObserver !== 'undefined') {
+    const ro = new ResizeObserver(measure);
+    for (const t of [leftCol, rightCol, timelineWrap, panels.stats.section, root]) ro.observe(t);
+  }
+  requestAnimationFrame(measure);
+
   function toast(msg: string): void {
     const t = h('div', { class: 'cx-toast', text: msg });
     toasts.append(t);
-    while (toasts.children.length > 3) toasts.firstElementChild?.remove();
+    while (toasts.children.length > 2) toasts.firstElementChild?.remove();
     requestAnimationFrame(() => t.classList.add('is-in'));
     window.setTimeout(() => {
       t.classList.remove('is-in');

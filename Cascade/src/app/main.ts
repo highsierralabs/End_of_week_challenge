@@ -141,7 +141,8 @@ async function run(p: ShowerParams, camera?: string, play = true): Promise<void>
     controls.setCameraPreset(preset === 'sky' ? null : preset);
     stage?.setPreset(preset === 'sky' ? 'overview' : preset);
     pushTime();
-    const secs = ((performance.now() - started) / 1000).toFixed(1);
+    const el = (performance.now() - started) / 1000;
+    const secs = el < 0.1 ? '<0.1' : el.toFixed(1);
     layout.toast(`${r.stats.particlesTracked.toLocaleString()} particles tracked in ${secs} s`);
   } catch (e) {
     controls.setBusy(null);

@@ -232,6 +232,38 @@ sub, sup { line-height: 0; }
 .vx-table td.vx-flag-ok { color: var(--ok); }
 .vx-table td.vx-flag-near { color: var(--warn); }
 .vx-table td.vx-flag-bad { color: var(--bad); }
+/* The big "All the numbers" table: 18 columns sized to fit a desktop column (about 1130 px). */
+.vx-table--dense th, .vx-table--dense td { padding: 5px 6px; }
+.vx-table--dense td { font-size: 11.5px; }
+.vx-table--dense thead th { white-space: normal; max-width: 7.5em; line-height: 1.25; font-size: 10.5px; letter-spacing: 0; }
+.vx-table--dense thead th:first-child { max-width: none; }
+.vx-table td small { display: block; font-size: 10px; line-height: 1.2; opacity: 0.85; }
+
+/* Scroll affordance for tables wider than their box (added by scrollAffordance() in validation.ts). */
+.vx-tablebox { position: relative; }
+.vx-fig .vx-tablebox { margin-top: 12px; }
+.vx-fig .vx-tablebox > .vx-tablewrap { margin-top: 0; }
+.vx-fade {
+  position: absolute;
+  top: 1px; right: 1px; bottom: 1px;
+  width: 72px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 8px 8px 0 0;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: linear-gradient(to right, rgba(8, 11, 20, 0), rgba(8, 11, 20, 0.96) 70%);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 3;
+}
+.vx-tablebox.has-more .vx-fade { opacity: 1; }
+
 .vx-prim { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font); }
 .vx-prim canvas { width: 12px; height: 12px; flex: none; }
 

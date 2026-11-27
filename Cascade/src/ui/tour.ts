@@ -112,9 +112,11 @@ export const TOUR: TourStep[] = [
     body: `<p>Muons are born high up and barely scatter, so they fly almost straight. Electrons and photons are
       scattered again and again by Coulomb fields and the cascade's own branching; their paths are longer and they
       fall behind.</p>
-      <p>The timing chart measures each ground particle's delay behind an ideal flat front moving at <i>c</i>.
-      Muons crowd near zero; e± and photons trail behind with a long tail, and the spread grows with distance from
-      the core.</p>`,
+      <p>The timing chart measures each ground particle's delay behind an ideal flat front moving at <i>c</i>,
+      for particles in a ring at a chosen distance from the core. Near the core everything arrives within a few ns.
+      At a few hundred metres the muons arrive tens of ns ahead of the electrons and photons, which trail with a
+      long tail, and the spread keeps growing with distance. Compare rings, not the pooled total: muons spread
+      farther out, where the curved front lags more, so pooling all distances makes them look later.</p>`,
     camera: 'ground',
     play: true,
     chart: 'timing',
@@ -260,6 +262,8 @@ export function createTour(el: HTMLElement, hd: TourHandlers, steps: TourStep[] 
     index = 0;
     isOpen = true;
     card.hidden = false;
+    // buildLayout listens for this: it closes an open phone drawer and marks the root.
+    el.dispatchEvent(new CustomEvent('cx:tour', { bubbles: true, detail: { open: true } }));
     render();
     requestAnimationFrame(() => card.classList.add('is-in'));
     next.focus({ preventScroll: true });
@@ -271,6 +275,7 @@ export function createTour(el: HTMLElement, hd: TourHandlers, steps: TourStep[] 
     isOpen = false;
     card.classList.remove('is-in');
     card.hidden = true;
+    el.dispatchEvent(new CustomEvent('cx:tour', { bubbles: true, detail: { open: false } }));
     returnFocus?.focus({ preventScroll: true });
     hd.onClose();
   }

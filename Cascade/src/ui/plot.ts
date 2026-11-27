@@ -324,3 +324,28 @@ export function haloText(ctx: CanvasRenderingContext2D, text: string, x: number,
   ctx.fillText(text, x, y);
   ctx.restore();
 }
+
+/**
+ * Label on an opaque rounded tag, so lines and curves never run through the text. `align` is
+ * relative to x; with `maxRight`, a left-aligned tag that would cross it flips to the left of x.
+ */
+export function tagText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string, align: 'left' | 'right' = 'left', maxRight = Infinity): void {
+  ctx.save();
+  ctx.font = `10.5px ${MONO}`;
+  const w = ctx.measureText(text).width;
+  const padX = 4;
+  let left = align === 'left' ? x : x - w;
+  if (align === 'left' && left + w + padX > maxRight) left = x - 10 - w;
+  const top = y - 10;
+  ctx.fillStyle = 'rgba(6, 9, 17, 0.92)';
+  ctx.strokeStyle = 'rgba(170, 190, 230, 0.22)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(left - padX, top, w + 2 * padX, 14, 3);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.textAlign = 'left';
+  ctx.fillText(text, left, y);
+  ctx.restore();
+}
