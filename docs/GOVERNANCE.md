@@ -26,7 +26,8 @@ cards, librarians, CHG routing) is not used.
    forward with a new commit or `git revert`. Local amend of an unpushed commit is
    allowed.
 8. **Gate before push.** `node tools/gate.mjs` gives one verdict over: the project check
-   (typecheck, lint, unit tests), the production build, the commit-message audit, a
+   (typecheck, lint, unit tests), the production build, a smoke test of the built site in GPU
+   Chromium on both backends, the commit-message audit, a
    public-safety scan (no user-home paths, host names, device serials, MAC addresses or
    credentials in tracked files), and a clean working tree.
 9. **Gate-then-amend (SOP Amendment A1).** The last commit before a push is gated over

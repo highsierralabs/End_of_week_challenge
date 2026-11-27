@@ -1,11 +1,12 @@
 // PURPOSE: Closeout gate for End_of_week_challenge (adapted RHACO-SOP-20260708-001 v4 section 5
 //          "Gate command"): one PASS/FAIL verdict over its member checks.
-// USAGE:   node tools/gate.mjs [--range <rev-range>] [--allow-dirty]
+// USAGE:   node tools/gate.mjs [--range <rev-range>] [--allow-dirty] [--no-smoke]
 // OUTPUT:  one ASCII line per member and a final tuple line, e.g.
 //          gate: check=PASS build=PASS msgs=PASS public=PASS clean=PASS -> PASS
 //          Exit 0 on PASS, 1 on FAIL.
 // VERSION HISTORY:
 //   1.0  2026-11-26  Initial release: check, build, commit-message audit, public-safety scan, clean tree.
+//   1.1  2026-11-26  Smoke member: the production build in GPU Chromium on both backends.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -29,6 +30,9 @@ const git = (...a) => execFileSync('git', a, { cwd: root, encoding: 'utf8' });
 // 1-2: project checks and production build.
 run('check', 'npm', ['run', 'check'], join(root, 'Cascade'));
 run('build', 'npm', ['run', 'build'], join(root, 'Cascade'));
+// 2b: the built site boots and runs on WebGPU and WebGL2 (needs a GPU; --no-smoke skips it).
+if (args.includes('--no-smoke')) { results.smoke = 'SKIP'; console.log('smoke: SKIP'); }
+else run('smoke', 'npm', ['run', 'smoke'], join(root, 'Cascade'));
 
 // 3: every commit message in range follows the grammar.
 {
