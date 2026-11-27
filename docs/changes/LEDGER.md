@@ -19,3 +19,4 @@
 | EOWC-CHG-20261126-015 | Sky mode on a worker pool (plan / simulate / merge), 9 s to 2 s |
 | EOWC-DOC-20261126-016 | Findings note for the RHACO observatory |
 | EOWC-CHG-20261126-017 | Split big showers across the worker pool; readout flags Xmax past the ground |
+| EOWC-DOC-20261126-018 | Physics doc: split showers and sky mode; architecture table matches the tree |

@@ -106,6 +106,24 @@ from the core are noisy.
 - The longitudinal profile: weighted particles crossing horizontal planes, labelled by
   slant depth, with a Gaisser-Hillas fit (Nelder-Mead in log space).
 
+## 7a Parallel showers and sky mode
+
+- **Split showers.** A shower of 3 PeV or more is split.
+  - **The head.** The primary and its first products are tracked highest-energy-first until the stack holds at least
+    96 particles and none carries more than 1/48 of E0.
+  - **The parts.** The stack is divided into 8 energy-balanced parts. Each part continues on the head's clock with
+    its own RNG stream in a pool worker.
+  - **The merge.** Profiles and counts are summed and the Gaisser-Hillas fit is redone.
+  - **Determinism.** The part count is fixed, so a seed gives the same shower on any machine, though not the same
+    shower as an unsplit run of that seed. The two are statistically equivalent: Xmax 597 vs 613 g/cm^2 at 10 PeV,
+    660 vs 664 at 100 PeV (6 showers each).
+- **Sky mode** (`sky.ts`). Showers above 20 TeV land in an 18 km x 18 km square.
+  - **Arrival times.** A Poisson process at the all-particle flux: `E^2.6 J = 4000 GeV^1.6 m^-2 s^-1 sr^-1`
+    below a 4 PeV knee, zenith below 60 degrees, about 4 x 10^5 showers per second into the square.
+  - **Showers.** Energies are drawn from `E^-2.7`. The mix is 45 % protons, 30 % helium, 15 % nitrogen and 10 % iron.
+  - **Replay.** Each shower is simulated and placed on a common clock, so one replay shows about 100 microseconds of
+    real sky.
+
 ## 8 Rate mode (`rate.ts`)
 
 The steady flux of muons at the site, and what a 1 cm^3 crystal in a lead castle counts

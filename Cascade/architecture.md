@@ -22,12 +22,15 @@ arrival times, and a comparison against a small aggregate snapshot of RHACO data
 | Path | Owner | What |
 |---|---|---|
 | `src/physics/**` | lead | Pure, deterministic Monte Carlo. No three, no DOM, no Math.random, no Date.now. `types.ts` is the contract. |
-| `src/sim/**` | lead | Worker entry + main-thread client wrapper. |
-| `src/render/scene.ts`, `src/render/tracks.ts`, `src/render/detector.ts`, `src/render/camera.ts`, `src/render/post.ts` | lead | Renderer setup, track replay, detector castle, camera rig, bloom. |
+| `src/sim/**` | lead | Worker entry; main-thread client with a worker pool (single showers, split showers, sky mode). |
+| `src/audio/**` | lead | Web Audio sonification of the replay. |
+| `src/render/stage.ts`, `src/render/tracks.ts`, `src/render/detector.ts` | lead | Renderer, bloom and camera rig (stage), track replay, detector castle. |
 | `src/render/terrain.ts`, `src/render/sky.ts`, `scripts/fetch-dem.mjs`, `public/dem/**` | terrain agent | Real DEM terrain of the Reno-Stead area, night sky with stars. |
 | `src/ui/**`, `src/styles.css` | ui agent | Control panel, charts (canvas 2D), explanations / guided tour text, layout. |
 | `src/data/rhaco_snapshot.json`, `scripts/rhaco_snapshot.py`, `docs/rhaco_snapshot.md` | data agent | Aggregate, operator-safe RHACO snapshot + its provenance. |
-| `src/app/main.ts`, `index.html`, `validation.html`, `src/app/validation.ts` | lead | Integration. |
+| `src/app/main.ts`, `index.html` | lead | Integration. |
+| `validation.html`, `src/app/validation.*`, `scripts/precompute-validation.ts` | validation agent | The validation page and its precomputed ensemble. |
+| `src/ui/observatory.ts`, `src/physics/rate.ts`, `scripts/precompute-rate.ts`, `scripts/precompute-corehits.ts` | lead | The RHACO comparison: rate mode, shower-core rates, the Data panel. |
 
 ## 3 Frames and units
 
