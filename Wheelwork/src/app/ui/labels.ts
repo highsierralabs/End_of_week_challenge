@@ -37,7 +37,7 @@ export class ToothLabels {
 
   frame(): void {
     const { stage, model } = this.app;
-    const visible = this.on && stage.caseOpen > 0.7 && stage.lamp < 0.5;
+    let visible = this.on && stage.caseOpen > 0.7 && stage.lamp < 0.5;
     const key = model.layout.wheels.map((w) => w.teeth).join(',');
     if (key !== this.builtFor) { this.builtFor = key; this.rebuild(); }
     const width = stage.canvas.clientWidth;
@@ -45,6 +45,15 @@ export class ToothLabels {
     const selected = this.app.selectedTrain;
     const [rx, ry] = stage.screenRight();
     const [ix, iy] = [DESIGN.centreDistance * Math.cos(DESIGN.idlerAngle), DESIGN.centreDistance * Math.sin(DESIGN.idlerAngle)];
+    if (visible) {
+      // On each side there is one tag to a level. Where the levels stand closer on screen than a tag
+      // is tall (a small window, a distant camera) the tags would lie on each other: show none.
+      const low = this.tags.find((t) => t.wheel.level === 1);
+      const high = this.tags.find((t) => t.wheel.level === 2);
+      const a = low && stage.project(0, 0, low.wheel.z + stage.liftOf(low.wheel.id));
+      const b = high && stage.project(0, 0, high.wheel.z + stage.liftOf(high.wheel.id));
+      if (!a || !b || Math.abs(a.y - b.y) < 15) visible = false;
+    }
     for (const t of this.tags) {
       let p: { x: number; y: number } | null = null;
       if (visible) {

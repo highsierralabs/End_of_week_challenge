@@ -43,13 +43,17 @@ input[type="range"] { accent-color: var(--brass); }
 .brand .since { color: var(--dim); font-size: 13.5px; max-width: 30em; min-height: 2.9em; }
 
 /* ---- views */
-.views { position: absolute; left: 22px; bottom: 126px; display: flex; flex-wrap: wrap; gap: 6px; max-width: calc(100vw - var(--drawer) - 60px); }
+/* The dock: the view buttons standing on the transport, bottom left, in whatever room the drawer leaves. */
+.dock { position: absolute; left: 22px; bottom: 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: calc(100vw - var(--drawer) - 44px); pointer-events: none !important; }
+.dock > * { pointer-events: auto; }
+body.drawer-closed .dock { max-width: calc(100vw - 44px); }
+.views { display: flex; flex-wrap: wrap; gap: 6px; }
 .views .sep { width: 10px; }
 .views button { background: var(--panel); font-size: 13.5px; }
 .views button[aria-pressed="true"] { background: #3a2c16; }
 
 /* ---- transport */
-.transport { position: absolute; left: 22px; bottom: 16px; background: var(--panel); border: 1px solid var(--rule); border-radius: 5px; padding: 9px 12px; display: flex; flex-direction: column; gap: 7px; max-width: calc(100vw - var(--drawer) - 60px); backdrop-filter: blur(6px); }
+.transport { background: var(--panel); border: 1px solid var(--rule); border-radius: 5px; padding: 9px 12px; display: flex; flex-direction: column; gap: 7px; max-width: 100%; backdrop-filter: blur(6px); }
 .transport .row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 .transport .play { min-width: 4.4em; font-weight: 600; background: rgba(217, 178, 102, 0.22); border-color: var(--brass); }
 .transport .goto { display: flex; align-items: center; gap: 5px; margin: 0; }
@@ -67,7 +71,7 @@ input[type="range"] { accent-color: var(--brass); }
 .drawer.closed { transform: translateX(calc(100% - 0px)); }
 .drawer .bar { display: flex; align-items: stretch; border-bottom: 1px solid var(--rule); }
 .drawer .tabs { display: flex; flex: 1; }
-.drawer .tabs button { flex: 1; border: 0; border-right: 1px solid var(--rule); border-radius: 0; padding: 0.7em 0.1em; background: transparent; font-variant: small-caps; letter-spacing: 0.03em; font-size: 14.5px; color: var(--dim); }
+.drawer .tabs button { flex: 1; border: 0; border-right: 1px solid var(--rule); border-radius: 0; padding: 0.7em 0.1em; background: transparent; font-variant: small-caps; letter-spacing: 0.01em; font-size: 13.5px; color: var(--dim); }
 .drawer .tabs button[aria-selected="true"] { color: var(--brass); background: rgba(217, 178, 102, 0.1); box-shadow: inset 0 -2px 0 var(--brass); }
 .drawer .collapse { border: 0; border-radius: 0; background: transparent; color: var(--dim); font-size: 13px; padding: 0 0.8em; }
 .drawer.closed .collapse { position: absolute; right: 100%; top: 14px; background: var(--panel); border: 1px solid var(--rule); border-right: 0; border-radius: 4px 0 0 4px; padding: 0.5em 0.8em; color: var(--brass); }
@@ -179,13 +183,32 @@ details summary { cursor: pointer; color: var(--brass); margin: 8px 0; }
   .drawer.closed { transform: translateY(calc(100% - 42px)); }
   .drawer.closed .collapse { position: static; border: 0; background: transparent; }
   .drawer .body { padding: 12px 14px 22px; }
-  .transport { left: 8px; right: 8px; bottom: calc(46vh + 8px); max-width: none; padding: 6px 8px; }
-  .transport .row:last-child { display: none; }
-  .views { left: 8px; right: 8px; bottom: calc(46vh + 70px); max-width: none; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-  .views button { flex: none; }
+  .drawer .tabs button { font-size: 13px; letter-spacing: 0; }
+  /* The dock sits on the sheet; its rows scroll sideways rather than wrap, so it keeps one height. */
+  .dock { left: 8px; right: 8px; bottom: calc(46vh + 8px); max-width: none; gap: 6px; align-items: stretch; }
+  body.sheet-closed .dock { bottom: 50px; max-width: none; }
+  .views { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .views::-webkit-scrollbar { display: none; }
+  .views button { flex: none; font-size: 12.5px; padding: 0.55em 0.7em; }
   .views .sep { display: none; }
-  .views button { font-size: 12px; padding: 0.3em 0.55em; }
-  body.sheet-closed .transport { bottom: 50px; }
-  body.sheet-closed .views { bottom: 112px; }
+  .transport { padding: 6px 8px; gap: 6px; }
+  .transport .row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .transport .row::-webkit-scrollbar { display: none; }
+  .transport .row > * { flex: none; }
+  .transport button, .transport select, .transport input { min-height: 34px; }
+  .transport .label { display: none; }
+  .dial { width: 40px; height: 40px; }
+  .dial .arm::before { top: -14px; height: 14px; }
+  .dial .knob { top: -19px; }
+  button { min-height: 32px; }
+  /* The tour's Back and Next stay in reach at the bottom of the sheet. */
+  .tournav { position: sticky; bottom: -22px; background: var(--panel-solid); margin: 12px -14px -22px; padding: 10px 14px 12px; }
+  table.readings { font-size: 12.5px; }
+  table.readings th, table.readings td { white-space: normal; padding: 3px 2px; }
+  .trainlist { grid-template-columns: 1fr; }
+}
+/* A short, wide window (a phone on its side): the sheet would leave no room, so it starts closed-height. */
+@media (max-width: 980px) and (min-width: 821px) {
+  .transport .row { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) { .drawer { transition: none; } }

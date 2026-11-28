@@ -16,7 +16,8 @@ import { extname, join, normalize } from 'node:path';
 import { chromium } from 'playwright';
 
 const root = join(import.meta.dirname, '..');
-const dist = join(root, 'dist');
+// WW_DIST points the test at another build folder (used while something else is serving dist/).
+const dist = join(root, process.env.WW_DIST ?? 'dist');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json' };
 const server = createServer(async (req, res) => {
   const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
@@ -147,14 +148,18 @@ try {
     await page.selectOption('.goto select', '1');
     await page.fill('.goto .year', '2100');
     await page.click('.goto button[type="submit"]');
-    await settle(page, 3400);
+    await settle(page, 300);
+    await page.waitForFunction(() => !window.wheelwork.app.gliding, null, { timeout: 60000 });
+    await settle(page, 250);
     const d2100 = await page.textContent('.brand .date');
     check(d2100 === '1 January 2100', `desktop: turns to a date (${ascii(d2100)})`);
     const sinceText = await page.textContent('.brand .since');
     check(/turns of the crank/.test(sinceText ?? ''), `desktop: says how far it has run (${ascii(sinceText).slice(0, 60)})`);
     await page.fill('.goto .year', '-500');
     await page.click('.goto button[type="submit"]');
-    await settle(page, 3400);
+    await settle(page, 300);
+    await page.waitForFunction(() => !window.wheelwork.app.gliding, null, { timeout: 60000 });
+    await settle(page, 200);
     check((await page.textContent('.brand .date')) === '1 January 501 BC', `desktop: turns to a BC date (${ascii(await page.textContent('.brand .date'))})`);
     await page.click('button:has-text("Re-set here")');
     const reset = await W(page, () => ({ turns: window.wheelwork.model.turns, err: Math.abs(window.wheelwork.model.reading().planets.mars.gearing) }));
@@ -169,6 +174,8 @@ try {
       const p = await picture(page);
       check(v.view === id && p.spread > 8, `desktop: view "${label}" (case ${v.open.toFixed(2)}, exploded ${v.explode.toFixed(2)}, spread ${p.spread.toFixed(0)})`);
       if (id === 'train') {
+        await W(page, () => { const s = window.wheelwork.stage; s.camera.position.set(330, -200, 170); s.controls.target.set(10, 0, 70); s.controls.update(); });
+        await settle(page, 300);
         const tags = await page.locator('.toothlabels span:visible').count();
         check(tags === 24, `desktop: ${tags} tooth counts are written beside the wheels`);
       }
@@ -272,7 +279,8 @@ try {
     check(toured === stops, `desktop: all ${stops} tour stops show`);
     await W(page, () => window.wheelwork.app.tour.go(9));
     await page.click('.tour button:has-text("next eclipse")');
-    await settle(page, 5600);
+    await settle(page, 300);
+    await page.waitForFunction(() => !window.wheelwork.app.gliding, null, { timeout: 60000 });
     const ecl = await W(page, () => window.wheelwork.model.reading().eclipse.now);
     check(ecl === 'solar' || ecl === 'lunar', `desktop: runs to the next eclipse the machine shows (${ecl})`);
     await W(page, () => { window.wheelwork.app.tour.go(0); window.wheelwork.model.setTurns(0); });

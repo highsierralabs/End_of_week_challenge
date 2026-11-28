@@ -262,8 +262,8 @@ async function run(): Promise<void> {
       mars = Math.max(mars, Math.abs(rr.planets.mars.circle));
       mercury = Math.max(mercury, Math.abs(rr.planets.mercury.circle));
     }
-    check('Largest circle error of Mars in 60 years', `${f(mars, 1)}°`, 'about 10.7° (its equation of centre)', mars > 10 && mars < 11.6);
-    check('Largest circle error of Mercury in 60 years', `${f(mercury, 1)}°`, 'about 23.7° (its equation of centre)', mercury > 22.8 && mercury < 24.8);
+    check('Largest circle error of Mars in 60 years', `${f(mars, 1)}°`, 'about 10.7° (its equation of centre)', mars > 10.4 && mars < 11.0);
+    check('Largest circle error of Mercury in 60 years', `${f(mercury, 1)}°`, 'about 23.9° (its equation of centre, 23.7°, seen along the ecliptic)', mercury > 23.3 && mercury < 24.4);
     // Eclipse seasons: at every catalogue eclipse the machine's Sun should be near a node.
     let season = 0, near = 0, far = 0;
     for (const e of ECLIPSES) {

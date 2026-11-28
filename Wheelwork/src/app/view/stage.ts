@@ -307,7 +307,8 @@ export class Stage {
       case 'train': return { position: [500, -210, 200], target: [6, 0, top * 0.5 + 6], caseOpen: 1, explode: 0 };
       case 'exploded': return { position: [560, -760, 420], target: [0, 0, top * 0.5 + 120], caseOpen: 1, explode: 1 };
       case 'tellurion': return { position: [-118, 84, 66], target: [0, 4, ecl - 12], caseOpen: 0, explode: 0, follow: true };
-      case 'above': return { position: [0, -8, 700], target: [0, 0, top], caseOpen: 0, explode: 0 };
+      // High enough that Saturn, which stands well above the deck, stays in view wherever it is in its round.
+      case 'above': return { position: [0, -8, 960], target: [0, 0, top], caseOpen: 0, explode: 0 };
       case 'crank': return { position: [-560, -330, 250], target: [-40, 0, 62], caseOpen: 0, explode: 0 };
       case 'sky': return { position: [0, -500, 250], target: [0, 0, ecl], caseOpen: 0, explode: 0 };
     }
@@ -337,6 +338,8 @@ export class Stage {
       toTarget.add(e);
       this.followLast.copy(e);
     }
+    // Stand back by whatever the window's free area asks for.
+    to.sub(toTarget).multiplyScalar(this.fit).add(toTarget);
     if (seconds <= 0) {
       this.camera.position.copy(to);
       this.controls.target.copy(toTarget);
@@ -356,8 +359,22 @@ export class Stage {
     const h = this.canvas.clientHeight || 1;
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
-    // Keep the whole machine in view on a tall screen by widening the field of view.
-    this.camera.fov = w / h < 1 ? 30 + (1 - w / h) * 26 : 30;
+    this.camera.fov = 30;
+    // Keep the whole machine in the part of the window the drawer leaves free: where that part is
+    // narrow or short the camera stands farther back, by the same factor in every view.
+    const freeW = Math.max(1, w - Math.min(this.insetRight, w * 0.6));
+    const freeH = Math.max(1, h - Math.min(this.insetBottom, h * 0.6));
+    const fit = Math.max(1, (1.12 * h) / freeW, h / freeH);
+    if (Math.abs(fit - this.fit) > 1e-3) {
+      const k = fit / this.fit;
+      this.camera.position.sub(this.controls.target).multiplyScalar(k).add(this.controls.target);
+      if (this.tween) this.tween.to.sub(this.tween.toTarget).multiplyScalar(k).add(this.tween.toTarget);
+      this.fit = fit;
+      this.controls.maxDistance = 1700 * fit;
+      const fog = this.scene.fog as THREE.Fog;
+      fog.near = 1100 * fit;
+      fog.far = 2600 * fit;
+    }
     // Centre the machine in the part of the window the drawer leaves free.
     const sx = Math.min(this.insetRight, w * 0.6) / 2;
     const sy = Math.min(this.insetBottom, h * 0.6) / 2;
@@ -373,6 +390,8 @@ export class Stage {
 
   private insetRight = 0;
   private insetBottom = 0;
+  /** How many times farther back than its presets the camera stands, to fit the window. */
+  private fit = 1;
 
   /** Pixels of the canvas covered by the drawer on the right, or by the sheet at the bottom. */
   setInset(right: number, bottom: number): void {
@@ -444,7 +463,8 @@ export class Stage {
       if (this.tween) { this.tween.to.add(d); this.tween.toTarget.add(d); }
       else { this.camera.position.add(d); this.controls.target.add(d); }
     }
-    this.controls.update();
+    // Passing the frame time keeps the opening drift at one pace whatever the display's rate.
+    this.controls.update(dt);
     if (this.composer) this.composer.render(dt);
     else this.renderer.render(this.scene, this.camera);
     this.frames++;

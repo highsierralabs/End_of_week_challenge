@@ -72,7 +72,14 @@ export class WorkbenchPanel implements Panel {
         this.draft = null;
         this.candidates = null;
         this.app.model.setSpec(spec);
-        status.textContent = 'A new machine, designed to these limits.';
+        // The limits come first: when they cannot hold the drift asked, say by how much they miss.
+        const t = this.app.model.targets;
+        const drifts: [string, number][] = CHAIN.filter((m) => m !== 'earth').map((m) => [MEMBER_NAMES[m], Math.abs(driftPerCentury(spec, t, m))]);
+        drifts.push(["the Moon's nodes", Math.abs(nodeDriftPerCentury(spec, t))]);
+        const worst = drifts.sort((p, q) => q[1] - p[1])[0]!;
+        status.textContent = this.budget > 0 && worst[1] > this.budget * 1.001
+          ? `A new machine within these limits, but they cannot hold the drift asked: ${worst[0]} drifts ${fmt(worst[1], worst[1] < 10 ? 2 : 0)}° a century. Allow more teeth, or finer ones.`
+          : 'A new machine, designed to these limits.';
       } catch (e) {
         status.textContent = `No machine fits these limits: ${(e as Error).message}.`;
       }
@@ -94,7 +101,7 @@ export class WorkbenchPanel implements Panel {
     } }, 'Copy a link to this machine');
     return h('div.designer', null,
       h('h3', null, 'Have the solver design one'),
-      h('p', null, 'The designer settles the trains outwards from the Earth, which is the calendar, and for each one takes the coarsest teeth that hold the drift you allow. Coarse teeth are easier to cut, and to print.'),
+      h('p', null, 'The designer settles the trains outwards from the Earth, which is the calendar, and for each one takes the coarsest teeth that hold the drift you allow. Coarse teeth are easier to cut, and to print. The sliders govern the six trains of the gearbox; the three on the Earth\'s arm keep their own.'),
       h('label', null, h('span', null, 'Most teeth on a wheel'), maxTeeth, maxOut),
       h('label', null, h('span', null, 'Finest teeth (module)'), minModule, modOut),
       h('label', null, h('span', null, 'Drift allowed'), budget),

@@ -32,6 +32,10 @@ const SPEEDS: { label: string; days: number }[] = [
   { label: 'a century a second', days: 36525 },
 ];
 
+/** Half a second, in days: added before a date is named, so that rounding in the turn count cannot name the day before. */
+const DATE_EPS = 6e-6;
+const REDUCED_MOTION = (): boolean => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 const VIEWS: { id: ViewName; label: string; title: string }[] = [
@@ -106,7 +110,7 @@ export class App {
       views.append(b);
     }
     views.append(h('span.sep'));
-    this.caseButton = h('button', { type: 'button', title: 'Open or close the walnut case', 'aria-pressed': 'false', onclick: () => this.setCase(this.stage.caseTarget < 0.5) }, 'Case');
+    this.caseButton = h('button', { type: 'button', title: 'Open or close the walnut case', 'aria-pressed': 'false', onclick: () => this.setCase(this.stage.caseTarget < 0.5) }, 'Open case');
     this.lampButton = h('button', { type: 'button', title: 'Put out the room lights and light the Sun', 'aria-pressed': 'false', onclick: () => this.setLamp(this.stage.lampTarget < 0.5) }, 'Sun lamp');
     this.soundButton = h('button', { type: 'button', title: 'Hear the teeth of the crank pinion', 'aria-pressed': 'false', onclick: () => { this.sound.setOn(!this.sound.on); this.syncButtons(); } }, 'Sound');
     this.labels = new ToothLabels(this);
@@ -122,12 +126,14 @@ export class App {
     const month = h('select', { 'aria-label': 'Month' }, MONTHS.map((m, i) => h('option', { value: i + 1 }, m)));
     const year = h('input', { type: 'number', min: -2999, max: 3000, 'aria-label': 'Year (negative for BC)', class: 'year', title: 'Year; 0 is 1 BC, -43 is 44 BC' });
     const fillDate = () => {
-      const c = calendarFromJd(this.model.jd);
+      const c = calendarFromJd(this.model.jd + DATE_EPS);
       day.value = String(c.day); month.value = String(c.month); year.value = String(c.year);
     };
     fillDate();
     const go = () => {
-      const y = Math.max(-2999, Math.min(3000, Math.round(Number(year.value) || 0)));
+      // An empty or unreadable year means the year now shown, not year 0.
+      const typed = year.value.trim() === '' ? Number.NaN : Number(year.value);
+      const y = Math.max(-2999, Math.min(3000, Math.round(Number.isFinite(typed) ? typed : calendarFromJd(this.model.jd + DATE_EPS).year)));
       const m = Number(month.value);
       // A day the month does not have becomes its last day.
       let d = Math.max(1, Math.min(31, Math.round(Number(day.value) || 1)));
@@ -167,12 +173,20 @@ export class App {
     this.drawer = h('aside.drawer', null, h('div.bar', null, tabBar, collapse), this.drawerBody);
 
     this.tooltip = h('div.tooltip', { role: 'status' });
-    this.root.append(this.labels.el, brand, views, transport, this.drawer, this.tooltip);
+    // The view buttons stand on the transport, whatever height either wraps to.
+    const dock = h('div.dock', null, views, transport);
+    this.root.append(this.labels.el, brand, dock, this.drawer, this.tooltip);
     this.syncPlay();
     this.syncButtons();
   }
 
   private fillDate: () => void = () => {};
+  private tooltipTimer = 0;
+
+  /** Bring the top of the open panel into view. */
+  scrollPanelTop(): void {
+    this.drawerBody.scrollTop = 0;
+  }
 
   private buildDial(): HTMLElement {
     const dial = h('div.dial', { title: 'The crank: drag it round', role: 'slider', 'aria-label': 'Crank', tabindex: 0 }, h('div.arm', null, h('div.knob')));
@@ -228,6 +242,7 @@ export class App {
   layout(): void {
     const closed = this.drawer.classList.contains('closed');
     document.body.classList.toggle('sheet-closed', closed);
+    document.body.classList.toggle('drawer-closed', closed);
     if (this.root.style.display === 'none') { this.stage.setInset(0, 0); return; }
     const sheet = matchMedia('(max-width: 820px)').matches;
     const r = this.drawer.getBoundingClientRect();
@@ -237,7 +252,7 @@ export class App {
 
   setView(name: ViewName, seconds?: number): void {
     this.stage.controls.autoRotate = false;
-    this.stage.setView(name, seconds);
+    this.stage.setView(name, REDUCED_MOTION() ? 0 : seconds);
     this.syncButtons();
   }
 
@@ -279,7 +294,7 @@ export class App {
   }
 
   private syncPlay(): void {
-    const running = this.rate !== 0;
+    const running = this.rate !== 0 || this.glide !== null;
     this.playButton.textContent = running ? 'Stop' : 'Run';
     this.playButton.setAttribute('aria-pressed', String(running));
   }
@@ -290,11 +305,16 @@ export class App {
     this.model.setTurns(this.model.turns + turns);
   }
 
+  /** True while the machine is on its way to a date. */
+  get gliding(): boolean {
+    return this.glide !== null;
+  }
+
   /** Run the machine smoothly to a date. */
   glideTo(jd: number, seconds = 2.6): void {
     this.rate = 0;
+    this.glide = { fromJd: this.model.jd, toJd: jd, t: 0, duration: REDUCED_MOTION() ? 0.01 : seconds };
     this.syncPlay();
-    this.glide = { fromJd: this.model.jd, toJd: jd, t: 0, duration: seconds };
   }
 
   selectTrain(id: TrainId | null, open = true): void {
@@ -312,7 +332,12 @@ export class App {
       g.t = Math.min(1, g.t + dt / g.duration);
       const s = g.t * g.t * g.t * (g.t * (g.t * 6 - 15) + 10);
       this.model.goTo(g.fromJd + (g.toJd - g.fromJd) * s);
-      if (g.t >= 1) this.glide = null;
+      if (g.t >= 1) {
+        // Land on the date itself, not on a sum that rounds to it.
+        this.model.goTo(g.toJd);
+        this.glide = null;
+        this.syncPlay();
+      }
     } else if (this.rate !== 0) {
       this.model.setTurns(this.model.turns + (this.rate / this.model.daysPerTurn) * dt);
       // The model holds the machine inside the span the reference astronomy covers.
@@ -330,7 +355,7 @@ export class App {
 
   private refresh(): void {
     const m = this.model;
-    this.dateEl.textContent = formatDate(m.jd);
+    this.dateEl.textContent = formatDate(m.jd + DATE_EPS);
     const turns = m.turns;
     const days = m.jd - m.setJd;
     const years = Math.abs(days) / 365.25;
@@ -340,7 +365,10 @@ export class App {
       : `${span} ${days >= 0 ? 'after' : 'before'} it was set on ${formatDate(m.setJd)}: ${fmt(Math.abs(turns), Math.abs(turns) < 100 ? 1 : 0)} turns of the crank.`;
     const crank = this.model.pose().crankAngle;
     (this.crankDial.firstElementChild as HTMLElement).style.transform = `rotate(${(-crank * 180) / Math.PI}deg)`;
-    if (this.rate === 0 && !this.glide && document.activeElement?.closest?.('.goto') === null) this.fillDate();
+    // The date fields follow the machine unless someone is typing in them.
+    const active = document.activeElement;
+    const typing = !!active && (active.tagName === 'INPUT' || active.tagName === 'SELECT') && !!active.closest('.goto');
+    if (this.rate === 0 && !this.glide && !typing) this.fillDate();
     if (!this.drawer.classList.contains('closed')) this.tabs.get(this.tab)!.update();
   }
 
@@ -403,7 +431,8 @@ export class App {
         this.model.setTurns(this.model.turns + (this.drag.sign * d) / (2 * Math.PI));
         return;
       }
-      if (e.buttons !== 0 || e.pointerType === 'touch') { this.hideTooltip(); return; }
+      if (e.pointerType === 'touch') return;
+      if (e.buttons !== 0) { this.hideTooltip(); return; }
       const now = performance.now();
       if (now - lastPick < 40) return;
       lastPick = now;
@@ -424,14 +453,18 @@ export class App {
         const part = down.part;
         const w = part?.wheel ? this.model.layout.byId.get(part.wheel) : undefined;
         if (w) this.selectTrain(w.train);
-        else if (part && e.pointerType === 'touch') this.showTooltip(this.describe(part), e.clientX, e.clientY);
+        else if (part && e.pointerType === 'touch') {
+          this.showTooltip(this.describe(part), e.clientX, e.clientY);
+          clearTimeout(this.tooltipTimer);
+          this.tooltipTimer = window.setTimeout(() => this.hideTooltip(), 3200);
+        }
         else if (!part) this.selectTrain(null, false);
       }
       down = null;
     };
     canvas.addEventListener('pointerup', up);
     canvas.addEventListener('pointercancel', () => { this.drag = null; this.stage.controls.enabled = true; down = null; });
-    canvas.addEventListener('pointerleave', () => { this.stage.setHover(null); this.hideTooltip(); });
+    canvas.addEventListener('pointerleave', (e) => { if (e.pointerType === 'touch') return; this.stage.setHover(null); this.hideTooltip(); });
   }
 
   /** The crank shaft's outer end on screen, and which way a clockwise drag turns the machine. */
@@ -468,7 +501,8 @@ export class App {
   private bindKeys(): void {
     window.addEventListener('keydown', (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.classList.contains('dial'))) return;
+      // A focused control keeps its own keys: space presses a button, arrows move a slider or a select.
+      if (t && t.closest('button, a, input, select, textarea, summary, [role="slider"]')) return;
       if (e.key === ' ') { this.toggle(); e.preventDefault(); }
       else if (e.key === 'ArrowRight') { this.nudge(e.shiftKey ? 1 : 1 / 12); e.preventDefault(); }
       else if (e.key === 'ArrowLeft') { this.nudge(e.shiftKey ? -1 : -1 / 12); e.preventDefault(); }

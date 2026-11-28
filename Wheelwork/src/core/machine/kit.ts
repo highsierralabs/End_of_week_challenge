@@ -82,15 +82,12 @@ export function buildKit(layout: Layout, scale = 1): Kit {
   const byId = new Map<string, Part>(parts.map((p) => [p.id, p]));
   const pieces: KitPiece[] = [];
   const used = new Set<string>();
-  let serial = 0;
 
   const addMesh = (group: string, name: string, mesh: Mesh, opts: { count?: number; flip?: boolean; note?: string } = {}): void => {
     const m = bedded(mesh, !!opts.flip, scale);
     const stats = meshStats(m);
-    serial++;
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     pieces.push({
-      file: `${String(serial).padStart(2, '0')}-${slug}.stl`, name, group, count: opts.count ?? 1, mesh: m, note: opts.note,
+      file: '', name, group, count: opts.count ?? 1, mesh: m, note: opts.note,
       closed: checkClosed(m, 1e-5).closed, volume: stats.volume,
       size: [stats.max[0] - stats.min[0], stats.max[1] - stats.min[1], stats.max[2] - stats.min[2]],
       triangles: stats.triangles,
@@ -200,6 +197,14 @@ export function buildKit(layout: Layout, scale = 1): Kit {
   add('Tellurion', "Moon's stalk", ['moonStalk'], { note: 'Slides freely in the hole of the moon arm; its foot rides on the inclined ring.' });
   used.add('moonBall');
   addMesh('Bodies', 'Moon', socketBall(DESIGN.ballDiameter.moon / 2, 0.85), { flip: true, note: 'Printed socket up, standing on its flat.' });
+
+  // Keep each group together, in the order the machine goes together, and number the files in that order.
+  const order = ['Frame', 'Crank', 'Tubes', 'Gearbox wheels', 'Gearbox clusters', 'Arms', 'Tellurion', 'Bodies'];
+  pieces.sort((p, q) => order.indexOf(p.group) - order.indexOf(q.group));
+  pieces.forEach((p, i) => {
+    const slug = p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    p.file = `${String(i + 1).padStart(2, '0')}-${slug}.stl`;
+  });
 
   const missed = parts.filter((p) => !used.has(p.id)).map((p) => p.id);
   if (missed.length) throw new Error(`kit: parts left out: ${missed.join(', ')}`);

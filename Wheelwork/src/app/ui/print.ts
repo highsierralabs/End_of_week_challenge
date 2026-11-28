@@ -16,7 +16,7 @@ export class PrintPanel implements Panel {
   constructor(private app: App) {
     this.out = h('div.kit');
     this.status = h('p.status', { role: 'status' });
-    const scale = h('select', { 'aria-label': 'Scale', onchange: () => { this.scale = Number(scale.value); this.kit = null; this.update(); } },
+    const scale = h('select', { 'aria-label': 'Scale', onchange: () => { this.scale = Number(scale.value); this.kit = null; clear(this.out); this.status.textContent = 'The scale has changed; check the kit again.'; } },
       [1, 1.25, 1.5, 2].map((v) => h('option', { value: v, selected: v === 1 }, v === 1 ? 'as drawn (plates 216 mm across)' : `${v} times (plates ${fmt(216 * v, 0)} mm)`)));
     const build = h('button', { type: 'button', onclick: () => this.build(false) }, 'Check the kit');
     const save = h('button.primary', { type: 'button', onclick: () => this.build(true) }, 'Download the kit (.zip of STL files)');

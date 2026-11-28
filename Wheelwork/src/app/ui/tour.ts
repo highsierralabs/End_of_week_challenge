@@ -100,7 +100,7 @@ const STOPS: Stop[] = [
     enter: (app) => { app.setLamp(false); app.selectTrain(null, false); app.setView('above'); app.play(3, 1); },
     body: () => [
       p('The gearing is not this machine\'s real fault. Its arms turn at a steady rate in perfect circles, and planets do neither. Kepler found in 1609 that they move on ellipses, faster when nearer the Sun.'),
-      p('So even a perfectly geared orrery is wrong most of the time, by an amount that swings back and forth every orbit: up to 23.7° for Mercury and 10.7° for Mars, under 2° for the Earth and under 1° for Venus. The Sky tab shows both errors side by side.'),
+      p('So even a perfectly geared orrery is wrong most of the time, by an amount that swings back and forth every orbit: up to about 24° for Mercury and 11° for Mars, under 2° for the Earth and under 1° for Venus. The Sky tab shows both errors side by side.'),
       p('Some makers added eccentric wheels or slotted cranks to mimic this. This one does not; it shows you the size of the omission instead. The Sky panel also looks out from the machine\'s Earth, where these errors decide whether a planet is in the right part of the evening sky.'),
     ],
     live: (app) => {
@@ -233,6 +233,7 @@ export class TourPanel implements Panel {
     STOPS[this.index]!.enter(this.app);
     this.shownFor = '';
     this.update();
+    this.app.scrollPanelTop();
   }
 
   update(): void {

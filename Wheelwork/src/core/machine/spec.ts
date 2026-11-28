@@ -200,9 +200,13 @@ export function driftPerCentury(spec: MachineSpec, targets: Targets, member: Cha
   return 360 * (36525 / period - 36525 / targets.period[member]);
 }
 
-/** Drift of the node line, in degrees per century (signed, positive when the machine's nodes regress too fast). */
+/**
+ * Drift of the node line in longitude, in degrees per century, signed as the planets' drifts are:
+ * positive when the machine's node ends up ahead (at a greater longitude) of the sky's. The nodes
+ * run backwards, so a machine whose nodes regress too fast has a negative drift.
+ */
 export function nodeDriftPerCentury(spec: MachineSpec, targets: Targets): number {
-  return 360 * (36525 / machineNodeDays(spec, targets) - 36525 / targets.nodeDays);
+  return -360 * (36525 / machineNodeDays(spec, targets) - 36525 / targets.nodeDays);
 }
 
 function finestModule(spec: MachineSpec, ids: readonly StepId[]): number {

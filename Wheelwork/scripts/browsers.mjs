@@ -51,6 +51,8 @@ for (const [name, type] of [['firefox', firefox], ['webkit', webkit]]) {
     check((await page.evaluate(() => window.wheelwork.model.turns)) > 0.1, `${name}: Run turns the crank`);
     await page.click('.views button:has-text("Wheelwork")');
     await page.waitForTimeout(2500);
+    await page.evaluate(() => { const s = window.wheelwork.stage; s.camera.position.set(330, -200, 170); s.controls.target.set(10, 0, 70); s.controls.update(); });
+    await page.waitForTimeout(300);
     const tags = await page.locator('.toothlabels span:visible').count();
     check((await page.evaluate(() => window.wheelwork.stage.caseOpen)) > 0.9 && tags >= 12, `${name}: the case opens and ${tags} tooth counts are written`);
     await page.evaluate(() => window.wheelwork.app.selectTrain('earth-mars'));
