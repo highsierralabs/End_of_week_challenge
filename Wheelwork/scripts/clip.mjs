@@ -22,6 +22,9 @@ const ready = (page) => page.waitForFunction(() => window.wheelwork?.ready, null
 const FIXED_DAY = "window.wheelwork.model.resetTo(2461371.5);";
 const camera = (pos, target) => `(() => { const s = window.wheelwork.stage; s.controls.autoRotate = false; s.camera.position.set(${pos.join(',')}); s.controls.target.set(${target.join(',')}); s.controls.update(); })()`;
 
+// One meshing pair alone, close: Mars's wheel D and the pinion C that drives it.
+const MESH_CLOSE_UP = "(() => { const s = window.wheelwork.stage; const m = window.wheelwork.model; s.caseOpen = 1; s.controls.autoRotate = false; s.camera.position.set(90, -70, 170); s.controls.target.set(40, 0, 86); s.controls.update(); for (const p of s.parts) { const w = p.wheel ? m.layout.byId.get(p.wheel) : null; s.mesh(p.id).visible = !!w && !w.tellurion && w.level === 8; } })()";
+
 async function stills() {
   const browser = await launch();
   const shots = [
@@ -29,6 +32,7 @@ async function stills() {
     ['app.jpg', [1440, 810], '?still=1', '', 800],
     ['wheelwork.jpg', [1440, 810], '?still=1&ui=0&view=train', camera([430, -290, 235], [22, 6, 80]), 800],
     ['exploded.jpg', [1440, 810], '?still=1&ui=0&view=exploded', '', 1200],
+    ['mesh.jpg', [1200, 800], '?still=1&ui=0&view=train', MESH_CLOSE_UP, 900],
     ['tellurion.jpg', [1440, 810], '?still=1&ui=0&view=tellurion', '', 800],
     ['phases.jpg', [1440, 810], '?still=1&ui=0&view=tellurion&lamp=1', 'window.wheelwork.model.setTurns(0.32)', 2500],
     ['above.jpg', [1440, 810], '?still=1&ui=0&view=above', '', 800],

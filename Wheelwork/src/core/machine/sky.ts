@@ -1,7 +1,7 @@
 // The machine against the sky. The reference astronomy says where each body is and how fast it
 // goes in the mean; this module sets the machine by it, and reads the machine back against it.
 import { moonMeanLongitudeUnwrapped, moonNodeUnwrapped, moonState, MOON, sunGeocentricLongitude } from '../astro/moon';
-import { meanLongitudeUnwrapped, planetState, siderealPeriodDays } from '../astro/planets';
+import { elements, meanLongitudeUnwrapped, planetState, siderealPeriodDays } from '../astro/planets';
 import { norm180, norm360 } from '../astro/time';
 import { BODIES, type Body, CHAIN, DESIGN } from './design';
 import { type Rates, type Setting, zeroSetting } from './kinematics';
@@ -202,4 +202,54 @@ export function machineAtSyzygy(jd: number, setJd: number, rates: Rates, targets
   if (sunFromNode > 90) sunFromNode -= 180;
   if (sunFromNode < -90) sunFromNode += 180;
   return { elongation: norm360(moon - sun), latitude: latitudeOnInclinedOrbit(moon - node), sunFromNode };
+}
+
+export const WANDERERS = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn'] as const;
+export type Wanderer = (typeof WANDERERS)[number];
+
+export interface GeocentricReading {
+  /** Ecliptic longitude seen from the Earth: as the machine implies it, and in the sky. */
+  machine: number;
+  truth: number;
+  error: number;
+  /** Moving backwards through the zodiac at this moment. */
+  retrograde: boolean;
+  retrogradeTruth: boolean;
+}
+
+/**
+ * The sky as seen from the Earth. The machine knows directions from the Sun but not distances (its
+ * arms are spaced for clearance), so each planet is put on a circle of its true mean distance at the
+ * longitude its arm shows, and looked at from the machine's Earth.
+ */
+export function geocentricReading(pose: MachinePose, setJd: number, rates: Rates, targets: Targets): Record<Wanderer, GeocentricReading> {
+  const dpt = daysPerTurn(rates, targets);
+  const jd = setJd + pose.turns * dpt;
+  const out = {} as Record<Wanderer, GeocentricReading>;
+  const step = 0.5;
+  const machineAt = (b: Body, days: number): [number, number] => {
+    const lon = pose.angle[b] + (2 * Math.PI * rates.value[b] * days) / dpt;
+    const a = elements(b, jd).a;
+    return [a * Math.cos(lon), a * Math.sin(lon)];
+  };
+  const seen = (from: readonly [number, number], to: readonly [number, number]) => norm360(Math.atan2(to[1] - from[1], to[0] - from[0]) / DEG);
+  const truthAt = (b: Body, days: number): [number, number] => {
+    const st = planetState(b, jd + days);
+    return [st.xyz[0], st.xyz[1]];
+  };
+  const make = (machine: (days: number) => number, truth: (days: number) => number): GeocentricReading => {
+    const m = machine(0);
+    const t = truth(0);
+    return {
+      machine: m, truth: t, error: norm180(m - t),
+      retrograde: norm180(machine(step) - machine(-step)) < 0,
+      retrogradeTruth: norm180(truth(step) - truth(-step)) < 0,
+    };
+  };
+  out.sun = make((d) => seen(machineAt('earth', d), [0, 0]), (d) => sunGeocentricLongitude(jd + d));
+  out.moon = make((d) => norm360((pose.angle.moonSleeve + (2 * Math.PI * rates.value.moonSleeve * d) / dpt) / DEG), (d) => moonState(jd + d).lon);
+  for (const b of ['mercury', 'venus', 'mars', 'jupiter', 'saturn'] as const) {
+    out[b] = make((d) => seen(machineAt('earth', d), machineAt(b, d)), (d) => seen(truthAt('earth', d), truthAt(b, d)));
+  }
+  return out;
 }

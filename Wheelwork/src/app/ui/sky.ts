@@ -3,7 +3,7 @@ import { moonMeanLongitudeUnwrapped, moonState } from '../../core/astro/moon';
 import { meanLongitudeUnwrapped, planetState, siderealPeriodDays } from '../../core/astro/planets';
 import { formatDate, J2000, norm180 } from '../../core/astro/time';
 import { BODIES, type Body } from '../../core/machine/design';
-import { ECLIPSE_LIMITS, type BodyReading } from '../../core/machine/sky';
+import { ECLIPSE_LIMITS, type BodyReading, WANDERERS, type Wanderer } from '../../core/machine/sky';
 import { driftPerCentury, nodeDriftPerCentury } from '../../core/machine/spec';
 import { type App, type Panel } from './app';
 import { clear, degrees, fmt, h, signed, svg } from './dom';
@@ -29,6 +29,7 @@ export class SkyPanel implements Panel {
   private moonBox: HTMLElement;
   private heading: HTMLElement;
   private drift: HTMLElement;
+  private fromEarth: HTMLElement;
 
   /** Largest difference between mean and true longitude, sampled over an orbit (planets) or twenty years (Moon) from J2000. */
   private circleMax: Record<string, string> = {};
@@ -54,6 +55,7 @@ export class SkyPanel implements Panel {
     this.table = h('table.readings');
     this.moonBox = h('div.moonbox');
     this.drift = h('div.drift');
+    this.fromEarth = h('div.fromearth');
     this.el = h('section.panel.sky', null,
       this.heading,
       h('p.lede', null, 'Filled dots are where the machine puts each body; open rings are where it really is, from a reference ephemeris checked against JPL Horizons.'),
@@ -63,6 +65,9 @@ export class SkyPanel implements Panel {
       h('h3', null, 'Two kinds of error'),
       h('p', null, 'The gearing error grows steadily: a train of whole-number teeth never has exactly the right ratio. The circle error comes and goes each orbit: the arms turn evenly, but planets speed up near the Sun and slow down far from it. For Jupiter and Saturn it also holds a slow swing of over nine centuries, from their pull on each other.'),
       this.drift,
+      h('h3', null, 'As seen from the Earth'),
+      h('p', null, 'An orrery shows the planets from outside. Looked at from its own Earth, small errors round the Sun become large ones in our sky for the planets that come close to us, and each planet in turn appears to stop and go backwards. The machine has no true distances, its arms being spaced for clearance, so each planet is taken at its real mean distance in the direction its arm shows.'),
+      this.fromEarth,
     );
   }
 
@@ -152,5 +157,46 @@ export class SkyPanel implements Panel {
     driftRow("Moon's nodes", BODY_COLOURS.moon, nodeDriftPerCentury(model.spec, model.targets), '');
     t.append(tb);
     this.drift.append(t);
+
+    // ---- from the Earth
+    clear(this.fromEarth);
+    const geo = model.geocentric();
+    const names: Record<Wanderer, string> = { sun: 'Sun', moon: 'Moon', mercury: 'Mercury', venus: 'Venus', mars: 'Mars', jupiter: 'Jupiter', saturn: 'Saturn' };
+    const strip = svg('svg', { viewBox: '0 0 300 58', class: 'strip', role: 'img', 'aria-label': 'The zodiac as seen from the Earth: machine above, sky below' });
+    // The zodiac runs right to left, as it does for a northern observer facing south.
+    const xOf = (lon: number) => 296 - (lon / 360) * 292;
+    for (let sgn = 0; sgn < 12; sgn++) {
+      strip.append(svg('line', { x1: xOf(sgn * 30), y1: 12, x2: xOf(sgn * 30), y2: 46, class: 'tick' }));
+      const t2 = svg('text', { x: xOf(sgn * 30 + 15), y: 9, class: 'sign' });
+      t2.textContent = SIGN_NAMES[sgn]!.slice(0, 3);
+      strip.append(t2);
+    }
+    strip.append(svg('line', { x1: 4, y1: 22, x2: 296, y2: 22, class: 'orbit' }), svg('line', { x1: 4, y1: 38, x2: 296, y2: 38, class: 'orbit' }));
+    const lab1 = svg('text', { x: 4, y: 55, class: 'sign', style: 'text-anchor:start' });
+    lab1.textContent = 'top: machine';
+    const lab2 = svg('text', { x: 296, y: 55, class: 'sign', style: 'text-anchor:end' });
+    lab2.textContent = 'bottom: sky';
+    strip.append(lab1, lab2);
+    for (const w of WANDERERS) {
+      const g2 = geo[w];
+      const colour = BODY_COLOURS[w];
+      strip.append(svg('line', { x1: xOf(g2.machine), y1: 22, x2: xOf(g2.truth), y2: 38, stroke: colour, 'stroke-width': 0.6, opacity: Math.abs(xOf(g2.machine) - xOf(g2.truth)) > 100 ? 0 : 0.6 }));
+      strip.append(svg('circle', { cx: xOf(g2.machine), cy: 22, r: w === 'sun' ? 4 : 2.8, fill: colour }));
+      strip.append(svg('circle', { cx: xOf(g2.truth), cy: 38, r: w === 'sun' ? 4 : 2.8, class: 'truth', stroke: colour }));
+    }
+    const gt = h('table.readings');
+    gt.append(h('thead', null, h('tr', null, h('th', null, ''), h('th', null, 'Machine'), h('th', null, 'Sky'), h('th', null, 'Error'), h('th', { title: 'Direct: moving forwards through the zodiac. Retrograde: backwards.' }, 'Motion'))));
+    const gb = h('tbody');
+    for (const w of WANDERERS) {
+      const g2 = geo[w];
+      const word = (r: boolean) => (r ? 'retrograde' : 'direct');
+      const motion = w === 'sun' || w === 'moon' ? '' : g2.retrograde === g2.retrogradeTruth ? word(g2.retrograde) : `${word(g2.retrograde)}; sky ${word(g2.retrogradeTruth)}`;
+      gb.append(h('tr', null, h('th', { scope: 'row' }, h('i.dot', { style: `background:${BODY_COLOURS[w]}` }), names[w]),
+        h('td', null, zodiac(g2.machine)), h('td', null, zodiac(g2.truth)),
+        h('td', { class: Math.abs(g2.error) > 5 ? 'err bad' : Math.abs(g2.error) > 1 ? 'err warn' : 'err' }, `${signed(g2.error, 2)}\u00b0`),
+        h('td', { class: g2.retrograde ? 'warn' : '' }, motion)));
+    }
+    gt.append(gb);
+    this.fromEarth.append(strip, gt);
   }
 }

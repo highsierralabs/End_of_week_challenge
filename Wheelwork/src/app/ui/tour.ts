@@ -59,7 +59,7 @@ const STOPS: Stop[] = [
       const ratio = (s.b / s.a) * (s.d / s.c);
       const wanted = app.model.targets.period.mars / app.model.targets.period.earth;
       return [
-        p('The four wheels lit in blue join the Earth\'s tube to Mars\'s. Mars takes 1.8808 of our years to go round the Sun, so that is the ratio this train must make.'),
+        p('The four wheels lit in blue join the Earth\'s tube to Mars\'s; each wheel\'s tooth count is written beside it. Mars takes 1.8808 of our years to go round the Sun, so that is the ratio this train must make.'),
         p(`Wheel A on the Earth's tube has ${s.a} teeth and drives wheel B, ${s.b} teeth, on the cluster. Wheel C, ${s.c} teeth, on the same cluster drives wheel D, ${s.d} teeth, on Mars's tube.`),
         p(h('strong', null, `(${s.b}/${s.a}) × (${s.d}/${s.c}) = ${fmt(ratio, 6)}`), `. The sky asks for ${fmt(wanted, 6)}. The train is ${errorText(ratio / wanted - 1)}.`),
         p('Teeth come in whole numbers, so no train is ever exactly right. The craft is in getting close with wheels that can be made.'),
@@ -74,7 +74,7 @@ const STOPS: Stop[] = [
       const conv = convergents(wanted, 6).slice(0, 5);
       return [
         p('In 1682 Christiaan Huygens was designing a planetarium and needed Saturn to go round once in 29.43 years with one pair of wheels. He invented a method for it: write the ratio as a continued fraction and stop early. Each stopping point gives the best fraction there is for teeth that few.'),
-        p(`For the value used here, ${fmt(wanted, 4)}, the fractions run: `, conv.map((c, i) => [i ? ', ' : '', h('strong', null, `${c.p}/${c.q}`)]), '. Huygens cut 206 teeth and 7.'),
+        p(`For the value used here, ${fmt(wanted, 4)}, the fractions run: `, conv.map((c, i) => [i ? ', ' : '', h('strong', null, `${c.p}/${c.q}`)]), '. Huygens chose 206 teeth and 7, and the clockmaker Johannes van Ceulen cut them.'),
         p('This machine uses two pairs in each train instead of one. The products of two fractions fall much more thickly along the number line than single fractions do, so a train of four modest wheels gets closer than one pair of enormous ones. The Workbench will find them for you.'),
       ];
     },
@@ -101,7 +101,7 @@ const STOPS: Stop[] = [
     body: () => [
       p('The gearing is not this machine\'s real fault. Its arms turn at a steady rate in perfect circles, and planets do neither. Kepler found in 1609 that they move on ellipses, faster when nearer the Sun.'),
       p('So even a perfectly geared orrery is wrong most of the time, by an amount that swings back and forth every orbit: up to 23.7° for Mercury and 10.7° for Mars, under 2° for the Earth and under 1° for Venus. The Sky tab shows both errors side by side.'),
-      p('Some makers added eccentric wheels or slotted cranks to mimic this. This one does not; it shows you the size of the omission instead.'),
+      p('Some makers added eccentric wheels or slotted cranks to mimic this. This one does not; it shows you the size of the omission instead. The Sky panel also looks out from the machine\'s Earth, where these errors decide whether a planet is in the right part of the evening sky.'),
     ],
     live: (app) => {
       const r = app.model.reading();

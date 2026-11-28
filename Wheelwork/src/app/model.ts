@@ -4,7 +4,7 @@ import { jdFromCalendar } from '../core/astro/time';
 import { type Rates, type Setting, solveRates, wheelPhases } from '../core/machine/kinematics';
 import { buildLayout, type Layout } from '../core/machine/layout';
 import { type MachinePose, poseMachine } from '../core/machine/pose';
-import { daysPerTurn, readMachine, type Reading, settingFor, skyTargets } from '../core/machine/sky';
+import { daysPerTurn, type GeocentricReading, geocentricReading, readMachine, type Reading, settingFor, skyTargets, type Wanderer } from '../core/machine/sky';
 import { cloneSpec, DEFAULT_LIMITS, designMachine, type Limits, type MachineSpec, type Targets } from '../core/machine/spec';
 
 export type ModelEvent = 'spec' | 'setting' | 'time';
@@ -123,6 +123,11 @@ export class Model {
   pose(): MachinePose {
     this.cachedPose ??= poseMachine(this.spec, this.rates, this.setting, this.turns);
     return this.cachedPose;
+  }
+
+  /** The same moment as seen from the Earth. */
+  geocentric(): Record<Wanderer, GeocentricReading> {
+    return geocentricReading(this.pose(), this.setJd, this.rates, this.targets);
   }
 
   reading(): Reading {

@@ -9,6 +9,7 @@ import { Sound } from '../sound';
 import { type Stage, type ViewName } from '../view/stage';
 import { clear, fmt, h } from './dom';
 import { AboutPanel } from './about';
+import { ToothLabels } from './labels';
 import { PrintPanel } from './print';
 import { SkyPanel } from './sky';
 import { TourPanel } from './tour';
@@ -47,7 +48,8 @@ export class App {
   rate = 0;
   speedIndex = 2;
   direction = 1;
-  private glide: { from: number; to: number; t: number; duration: number } | null = null;
+  /** A run to a date in progress. Kept as dates: a change of gearing alters how many turns a date is. */
+  private glide: { fromJd: number; toJd: number; t: number; duration: number } | null = null;
   private tabs = new Map<TabName, Panel>();
   tab: TabName = 'tour';
   private drawer!: HTMLElement;
@@ -60,6 +62,8 @@ export class App {
   private lampButton!: HTMLButtonElement;
   private caseButton!: HTMLButtonElement;
   private soundButton!: HTMLButtonElement;
+  private teethButton!: HTMLButtonElement;
+  private labels!: ToothLabels;
   readonly sound = new Sound();
   private speedSelect!: HTMLSelectElement;
   private crankDial!: SVGElement | HTMLElement;
@@ -105,7 +109,9 @@ export class App {
     this.caseButton = h('button', { type: 'button', title: 'Open or close the walnut case', 'aria-pressed': 'false', onclick: () => this.setCase(this.stage.caseTarget < 0.5) }, 'Case');
     this.lampButton = h('button', { type: 'button', title: 'Put out the room lights and light the Sun', 'aria-pressed': 'false', onclick: () => this.setLamp(this.stage.lampTarget < 0.5) }, 'Sun lamp');
     this.soundButton = h('button', { type: 'button', title: 'Hear the teeth of the crank pinion', 'aria-pressed': 'false', onclick: () => { this.sound.setOn(!this.sound.on); this.syncButtons(); } }, 'Sound');
-    views.append(this.caseButton, this.lampButton, this.soundButton);
+    this.labels = new ToothLabels(this);
+    this.teethButton = h('button', { type: 'button', title: 'Write the tooth counts beside the wheels when the case is open', 'aria-pressed': 'true', onclick: () => { this.labels.on = !this.labels.on; this.syncButtons(); } }, 'Tooth counts');
+    views.append(this.caseButton, this.lampButton, this.teethButton, this.soundButton);
 
     // Transport.
     this.playButton = h('button.play', { type: 'button', title: 'Run or stop the machine (space)', onclick: () => this.toggle() });
@@ -126,6 +132,8 @@ export class App {
       // A day the month does not have becomes its last day.
       let d = Math.max(1, Math.min(31, Math.round(Number(day.value) || 1)));
       while (d > 28 && calendarFromJd(jdFromCalendar(y, m, d)).month !== m) d--;
+      // The ten days dropped when the calendar was reformed never happened: 4 October 1582 was followed by the 15th.
+      if (y === 1582 && m === 10 && d > 4 && d < 15) d = 15;
       day.value = String(d);
       year.value = String(y);
       this.glideTo(jdFromCalendar(y, m, d));
@@ -159,7 +167,7 @@ export class App {
     this.drawer = h('aside.drawer', null, h('div.bar', null, tabBar, collapse), this.drawerBody);
 
     this.tooltip = h('div.tooltip', { role: 'status' });
-    this.root.append(brand, views, transport, this.drawer, this.tooltip);
+    this.root.append(this.labels.el, brand, views, transport, this.drawer, this.tooltip);
     this.syncPlay();
     this.syncButtons();
   }
@@ -248,6 +256,7 @@ export class App {
     this.caseButton.setAttribute('aria-pressed', String(this.stage.caseTarget > 0.5));
     this.lampButton.setAttribute('aria-pressed', String(this.stage.lampTarget > 0.5));
     this.soundButton.setAttribute('aria-pressed', String(this.sound.on));
+    this.teethButton.setAttribute('aria-pressed', String(this.labels.on));
   }
 
   play(index: number = this.speedIndex, direction: number = this.direction): void {
@@ -285,8 +294,7 @@ export class App {
   glideTo(jd: number, seconds = 2.6): void {
     this.rate = 0;
     this.syncPlay();
-    const to = (jd - this.model.setJd) / this.model.daysPerTurn;
-    this.glide = { from: this.model.turns, to, t: 0, duration: seconds };
+    this.glide = { fromJd: this.model.jd, toJd: jd, t: 0, duration: seconds };
   }
 
   selectTrain(id: TrainId | null, open = true): void {
@@ -303,7 +311,7 @@ export class App {
       const g = this.glide;
       g.t = Math.min(1, g.t + dt / g.duration);
       const s = g.t * g.t * g.t * (g.t * (g.t * 6 - 15) + 10);
-      this.model.setTurns(g.from + (g.to - g.from) * s);
+      this.model.goTo(g.fromJd + (g.toJd - g.fromJd) * s);
       if (g.t >= 1) this.glide = null;
     } else if (this.rate !== 0) {
       this.model.setTurns(this.model.turns + (this.rate / this.model.daysPerTurn) * dt);
@@ -312,6 +320,7 @@ export class App {
     }
     this.sound.update(this.model.turns, this.model.spec.bevel.crank, now);
     this.stage.frame(dt);
+    this.labels.frame();
     if (this.dirty && now - this.lastRefresh > 90) {
       this.lastRefresh = now;
       this.dirty = false;

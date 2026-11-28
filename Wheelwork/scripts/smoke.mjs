@@ -168,6 +168,10 @@ try {
       const v = await W(page, () => ({ view: window.wheelwork.stage.view, open: window.wheelwork.stage.caseOpen, explode: window.wheelwork.stage.explode }));
       const p = await picture(page);
       check(v.view === id && p.spread > 8, `desktop: view "${label}" (case ${v.open.toFixed(2)}, exploded ${v.explode.toFixed(2)}, spread ${p.spread.toFixed(0)})`);
+      if (id === 'train') {
+        const tags = await page.locator('.toothlabels span:visible').count();
+        check(tags === 24, `desktop: ${tags} tooth counts are written beside the wheels`);
+      }
     }
     await page.click('.views button:has-text("Sun lamp")');
     await page.waitForFunction(() => window.wheelwork.stage.lamp > 0.97, null, { timeout: 15000 }).catch(() => {});
@@ -250,6 +254,8 @@ try {
     // Sky.
     await page.click('.drawer .tabs button:has-text("Sky")');
     await settle(page, 300);
+    const earthView = await W(page, () => ({ rows: document.querySelectorAll('.sky .fromearth tbody tr').length, sun: Math.abs(window.wheelwork.model.geocentric().sun.error) }));
+    check(earthView.rows === 7 && earthView.sun < 2.5, `desktop: the view from the Earth lists seven bodies (Sun ${earthView.sun.toFixed(2)} deg from the sky's)`);
     const sky = await W(page, () => ({ rows: document.querySelectorAll('.sky table.readings tbody tr').length, dots: document.querySelectorAll('.sky .plan circle').length, moon: document.querySelector('.sky .moonbox p')?.textContent }));
     check(sky.rows >= 15 && sky.dots > 20 && /lit/.test(sky.moon ?? ''), `desktop: the sky panel reads the machine (${ascii(sky.moon).slice(0, 50)})`);
 
@@ -277,7 +283,7 @@ try {
     await page.waitForFunction(() => /closed|faults|could not/.test(document.querySelector('.print .status').textContent), null, { timeout: 60000 });
     const kitStatus = await page.textContent('.print .status');
     const files = await page.locator('.print .files li:not(.group)').count();
-    check(/no pair of wheels interferes/.test(kitStatus ?? '') && files >= 60, `desktop: the kit checks out (${files} files; ${ascii(kitStatus)})`);
+    check(/no pair of spur wheels interferes/.test(kitStatus ?? '') && files >= 60, `desktop: the kit checks out (${files} files; ${ascii(kitStatus)})`);
     const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 60000 }), page.click('.print button:has-text("Download")')]);
     const path = await dl.path();
     const size = (await stat(path)).size;

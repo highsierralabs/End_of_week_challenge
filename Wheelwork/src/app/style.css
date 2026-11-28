@@ -90,7 +90,8 @@ input[type="range"] { accent-color: var(--brass); }
 table.readings { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; margin: 6px 0 10px; }
 table.readings th, table.readings td { text-align: right; padding: 3px 3px; border-bottom: 1px solid rgba(217, 178, 102, 0.12); white-space: nowrap; }
 table.readings thead th { color: var(--dim); font-weight: 400; font-variant: small-caps; letter-spacing: 0.05em; border-bottom: 1px solid var(--rule); }
-table.readings th[scope="row"], table.readings thead th:first-child { text-align: left; font-weight: 400; white-space: normal; }
+table.readings th[scope="row"], table.readings thead th:first-child { text-align: left; font-weight: 400; white-space: nowrap; }
+.print table.readings th[scope="row"], .workbench table.readings th[scope="row"] { white-space: normal; }
 table.readings .err { font-weight: 600; }
 .dot { display: inline-block; width: 0.62em; height: 0.62em; border-radius: 50%; margin-right: 0.45em; }
 
@@ -102,6 +103,11 @@ table.readings .err { font-weight: 600; }
 .plan .orbit { fill: none; stroke: rgba(217, 178, 102, 0.16); stroke-width: 0.7; }
 .plan .truth { fill: none; stroke-width: 1.3; }
 .plan .miss { fill: none; stroke-width: 2.2; opacity: 0.55; }
+.strip { width: 100%; display: block; margin: 6px 0; }
+.strip .tick { stroke: var(--brass-deep); stroke-width: 0.5; opacity: 0.6; }
+.strip .sign { fill: var(--faint); font-size: 6px; text-anchor: middle; font-family: var(--serif); letter-spacing: 0.05em; text-transform: uppercase; }
+.strip .orbit { stroke: rgba(217, 178, 102, 0.22); stroke-width: 0.6; }
+.strip .truth { fill: #14100c; stroke-width: 1.2; }
 .eclipse { color: var(--dim); }
 .eclipse.season { color: var(--warn); }
 .eclipse.now, .now { color: #ffd98a; font-weight: 600; }
@@ -146,6 +152,13 @@ details summary { cursor: pointer; color: var(--brass); margin: 8px 0; }
 .files li { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid rgba(217, 178, 102, 0.1); padding: 2px 0; margin: 0; }
 .files li span:last-child { color: var(--dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .files .group { color: var(--brass); font-variant: small-caps; letter-spacing: 0.08em; border-bottom: 1px solid var(--rule); margin-top: 8px; }
+
+/* ---- tooth counts beside the wheels */
+.toothlabels { position: absolute; inset: 0; overflow: hidden; pointer-events: none !important; }
+.toothlabels span { position: absolute; left: 0; top: 0; font-size: 12px; line-height: 1; padding: 2px 5px 2px 4px; border-radius: 2px; background: rgba(14, 10, 7, 0.78); color: #f3e7c8; border: 1px solid rgba(217, 178, 102, 0.35); white-space: nowrap; font-variant-numeric: tabular-nums; will-change: transform; }
+.toothlabels b { color: var(--brass); font-weight: 600; margin-right: 4px; font-size: 10.5px; }
+.toothlabels .sel { border-color: var(--blue); color: #fff; background: rgba(20, 44, 66, 0.9); }
+.toothlabels .sel b { color: var(--blue); }
 
 /* ---- tooltip */
 .tooltip { position: fixed; max-width: 300px; background: #1a140e; border: 1px solid var(--rule); border-radius: 4px; padding: 6px 9px; font-size: 13.5px; line-height: 1.35; pointer-events: none !important; opacity: 0; transition: opacity 0.12s; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6); z-index: 5; }

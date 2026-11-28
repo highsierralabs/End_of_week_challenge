@@ -307,7 +307,7 @@ export class Stage {
       case 'train': return { position: [500, -210, 200], target: [6, 0, top * 0.5 + 6], caseOpen: 1, explode: 0 };
       case 'exploded': return { position: [560, -760, 420], target: [0, 0, top * 0.5 + 120], caseOpen: 1, explode: 1 };
       case 'tellurion': return { position: [-118, 84, 66], target: [0, 4, ecl - 12], caseOpen: 0, explode: 0, follow: true };
-      case 'above': return { position: [0, -8, 840], target: [0, 0, top], caseOpen: 0, explode: 0 };
+      case 'above': return { position: [0, -8, 700], target: [0, 0, top], caseOpen: 0, explode: 0 };
       case 'crank': return { position: [-560, -330, 250], target: [-40, 0, 62], caseOpen: 0, explode: 0 };
       case 'sky': return { position: [0, -500, 250], target: [0, 0, ecl], caseOpen: 0, explode: 0 };
     }
@@ -451,6 +451,18 @@ export class Stage {
   }
 
   private lastExplode = -1;
+
+  /** The direction that runs to the right across the screen, as a unit vector in the plan of the machine. */
+  screenRight(): readonly [number, number] {
+    const e = this.camera.matrixWorld.elements;
+    const len = Math.hypot(e[0]!, e[1]!) || 1;
+    return [e[0]! / len, e[1]! / len];
+  }
+
+  /** How far a part is lifted in the exploded view, millimetres. */
+  liftOf(partId: string): number {
+    return this.meshes.get(partId)?.position.z ?? 0;
+  }
 
   /** Where a point of the machine falls on the canvas, in CSS pixels, or null when behind the camera. */
   project(x: number, y: number, z: number): { x: number; y: number } | null {

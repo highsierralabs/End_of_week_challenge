@@ -34,6 +34,31 @@ vec2 wwWood(vec3 pos) {
 }
 `;
 
+/**
+ * Spun brass: the faces of a wheel carry the fine circular grain a lathe leaves, which draws the
+ * highlight out along the radius. Worked from the distance to the wheel's own axis (every wheel is
+ * built on its axis), and faded out where the grain would be finer than a pixel.
+ */
+function spin(m: THREE.MeshPhysicalMaterial, key: string): THREE.MeshPhysicalMaterial {
+  m.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vSpinPos;\nvarying float vSpinFlat;\nvarying vec3 vSpinRadial;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSpinPos = position;\nvSpinFlat = abs(normal.z);\nvSpinRadial = normalMatrix * vec3(position.xy, 0.0);');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vSpinPos;\nvarying float vSpinFlat;\nvarying vec3 vSpinRadial;')
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        float spinR = length(vSpinPos.xy);
+        float spinOn = smoothstep(0.9, 0.99, vSpinFlat) * (1.0 - smoothstep(0.2, 0.55, fwidth(spinR) / 0.5));
+        float spinG = sin(spinR * 12.566) * 0.6 + sin(spinR * 31.7 + 1.7) * 0.4;
+        normal = normalize(normal + normalize(vSpinRadial + vec3(1e-5)) * (0.05 * spinG * spinOn));`)
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+        float spinR2 = length(vSpinPos.xy);
+        roughnessFactor += 0.05 * sin(spinR2 * 13.1) * smoothstep(0.9, 0.99, vSpinFlat) * (1.0 - smoothstep(0.2, 0.55, fwidth(spinR2) / 0.5));`);
+  };
+  m.customProgramCacheKey = () => `spin-${key}`;
+  return m;
+}
+
 interface WoodOptions {
   dark: number;
   light: number;
@@ -75,7 +100,7 @@ export class Materials {
     const metal = (color: number, roughness: number, extra: THREE.MeshPhysicalMaterialParameters = {}) =>
       new THREE.MeshPhysicalMaterial({ color, metalness: 1, roughness, ...extra });
     this.map.set('brass', metal(0xd9ae56, 0.2));
-    this.map.set('brassWheel', metal(0xe0b65c, 0.23));
+    this.map.set('brassWheel', spin(metal(0xe0b65c, 0.23), 'wheel'));
     this.map.set('brassDark', metal(0xa27e44, 0.38));
     this.map.set('steel', metal(0xc2c7cf, 0.28));
     this.sun = metal(0xffd47e, 0.16, { emissive: 0xffb548, emissiveIntensity: 0 });
