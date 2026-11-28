@@ -48,7 +48,7 @@ export class Sound {
     src.start();
   }
 
-  private tick(strength: number): void {
+  private tick(strength: number, delay = 0): void {
     const ctx = this.ctx!;
     const src = ctx.createBufferSource();
     src.buffer = this.noise;
@@ -57,7 +57,7 @@ export class Sound {
     filter.frequency.value = 2300 + 500 * strength;
     filter.Q.value = 4;
     const gain = ctx.createGain();
-    const t = ctx.currentTime;
+    const t = ctx.currentTime + delay;
     gain.gain.setValueAtTime(0, t);
     gain.gain.linearRampToValueAtTime(0.5 * strength, t + 0.002);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.035);
@@ -75,7 +75,11 @@ export class Sound {
     this.lastTooth = tooth;
     this.lastTime = now;
     // Under about thirty teeth a second each is heard; above, they blur into a whirr.
-    if (passed > 0 && rate < 32) this.tick(0.6 + 0.4 * Math.min(1, rate / 20));
+    // A slow frame may span several teeth: each gets its tick, spread over the frame just past.
+    if (passed > 0 && rate < 32) {
+      const n = Math.min(passed, 8);
+      for (let k = 0; k < n; k++) this.tick(0.6 + 0.4 * Math.min(1, rate / 20), (k * dt) / n);
+    }
     const level = rate < 20 ? 0 : Math.min(0.5, 0.12 + 0.1 * Math.log10(rate / 20));
     this.whirr!.gain.setTargetAtTime(level, this.ctx.currentTime, 0.06);
     this.whirrFilter!.frequency.setTargetAtTime(Math.min(2400, 300 + 14 * Math.min(rate, 150)), this.ctx.currentTime, 0.1);

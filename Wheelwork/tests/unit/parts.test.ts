@@ -49,3 +49,30 @@ describe('print kit', () => {
     console.log(kit.readme);
   });
 });
+
+describe('fits in the print kit', () => {
+  const layout = buildLayout(designMachine(TARGETS));
+  const kit = buildKit(layout);
+  const piece = (re: RegExp) => kit.pieces.find((p) => re.test(p.name))!;
+  it('stands every ball and pillar on a flat face', () => {
+    for (const name of [/^Sun$/, /^Mercury$/, /^Venus$/, /^Mars$/, /^Jupiter$/, /^Saturn$/, /^Moon$/, /^Pillar, lower$/, /^Pillar, upper$/, /^Saturn's ring$/, /^Base plate$/]) {
+      const p = piece(name);
+      let onBed = 0;
+      for (let i = 2; i < p.mesh.positions.length; i += 3) if (p.mesh.positions[i]! < 1e-6) onBed++;
+      expect(onBed, p.name).toBeGreaterThan(8);
+    }
+  });
+  it('draws fixed fits size for size', () => {
+    // Mercury's wheel A is bored to the tube's outside radius, 4 mm: the innermost ring of the piece.
+    const wheel = piece(/^Mercury to Venus wheel A/);
+    const pos = wheel.mesh.positions;
+    const ring: [number, number][] = [];
+    // The piece is centred on the bed by its bounding box, which need not be its axis: fit the ring's own centre.
+    for (let i = 0; i < pos.length; i += 3) if (Math.hypot(pos[i]!, pos[i + 1]!) < 4.3) ring.push([pos[i]!, pos[i + 1]!]);
+    const cx = ring.reduce((t, q) => t + q[0], 0) / ring.length;
+    const cy = ring.reduce((t, q) => t + q[1], 0) / ring.length;
+    const radius = ring.reduce((t, q) => t + Math.hypot(q[0] - cx, q[1] - cy), 0) / ring.length;
+    expect(ring.length).toBeGreaterThan(16);
+    expect(radius).toBeCloseTo(4, 3);
+  });
+});

@@ -67,7 +67,7 @@ for pose in sorted(d for d in os.listdir(root) if d.startswith('pose')):
     nonmanifold = []
     for entry in manifest:
         bm = load(os.path.join(folder, entry['file']))
-        bad_edges = sum(1 for e in bm.edges if len(e.link_faces) % 2 == 1)
+        bad_edges = sum(1 for e in bm.edges if len(e.link_faces) != 2)
         if bad_edges:
             nonmanifold.append((entry['id'], bad_edges))
         lo = Vector((min(v.co.x for v in bm.verts), min(v.co.y for v in bm.verts), min(v.co.z for v in bm.verts)))

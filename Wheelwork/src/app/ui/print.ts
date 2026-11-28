@@ -24,7 +24,7 @@ export class PrintPanel implements Panel {
       h('h2', null, 'Print'),
       h('p.lede', null, 'The machine on the workbench, as files for a 3D printer: every wheel, cluster, tube, arm, plate and pillar, with a parts list and assembly notes.'),
       h('p', null, 'The solids are the ones drawn on screen, made again at finer detail and with a little more backlash. The walnut case and the engraving are not in the kit.'),
-      h('p.caution', null, h('strong', null, 'This kit has not been printed.'), " Each file is checked to be a closed solid and each pair of wheels is run through a full tooth pitch to look for interference, but fits and clearances are nominal and no one has put it together. The parts on the Earth's arm are small; they want a resin printer or a larger scale."),
+      h('p.caution', null, h('strong', null, 'This kit has not been printed.'), " Each file is checked to be a closed solid and each pair of spur wheels is run through a full tooth pitch to look for interference, but fits and clearances are nominal and no one has put it together. The parts on the Earth's arm are small; they want a resin printer or a larger scale."),
       h('label', null, h('span', null, 'Scale'), scale),
       h('div.buttons', null, build, save),
       this.status,
@@ -45,7 +45,7 @@ export class PrintPanel implements Panel {
           download(bytes, 'wheelwork-kit.zip', 'application/zip');
           this.status.textContent = `Saved ${kit.pieces.length} files, ${fmt(bytes.length / 1e6, 1)} MB.`;
         } else {
-          this.status.textContent = kit.ok ? 'Every solid is closed and no pair of wheels interferes.' : 'The kit has faults: see below.';
+          this.status.textContent = kit.ok ? 'Every solid is closed and no pair of spur wheels interferes.' : 'The kit has faults: see below.';
         }
         this.render();
       } catch (e) {
@@ -61,7 +61,7 @@ export class PrintPanel implements Panel {
     const pieces = kit.pieces.reduce((n, p) => n + p.count, 0);
     this.out.append(
       h('p', null, `${pieces} pieces from ${kit.pieces.length} files. The largest lies ${fmt(kit.largest[0], 0)} by ${fmt(kit.largest[1], 0)} mm on the bed; the tallest stands ${fmt(kit.largest[2], 0)} mm. About ${fmt(kit.totalVolume / 1000, 0)} cm³ of plastic if printed solid.`),
-      h('h3', null, 'Pairs of wheels'),
+      h('h3', null, 'Pairs of spur wheels'),
     );
     const t = h('table.readings');
     t.append(h('thead', null, h('tr', null, h('th', null, 'Train'), h('th', null, 'Teeth'), h('th', { title: 'Tooth size' }, 'Module'), h('th', { title: 'Above 1, a tooth is always engaged' }, 'Contact'), h('th', { title: 'Smallest gap between the wheels over a tooth pitch' }, 'Gap'))));

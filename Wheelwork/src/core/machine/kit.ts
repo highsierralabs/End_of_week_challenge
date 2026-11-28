@@ -6,7 +6,7 @@ import { checkClosed, cylinder, lathe, merge, meshStats, rotationX, rotationY, t
 import { type Mesh, type Vec2 } from '../mesh/types';
 import { BODIES, CHAIN, DESIGN } from './design';
 import { type Layout, type Wheel } from './layout';
-import { buildParts, eclipticZ, type Part, PRINT_DETAIL, trainName, wheelSolid, wheelStyle } from './parts';
+import { buildParts, EARTH_SOCKET_TOP, eclipticZ, type Part, PRINT_DETAIL, saturnRingFlat, trainName, wheelSolid, wheelStyle } from './parts';
 import { TRAIN_IDS } from './spec';
 
 export interface KitPiece {
@@ -57,16 +57,23 @@ function bedded(mesh: Mesh, flip: boolean, scale: number): Mesh {
   return { positions: p, indices: moved.indices };
 }
 
-/** A ball with a blind socket for its stalk, centred on the origin, socket downwards. */
-function socketBall(radius: number, socketRadius: number, segments = 64): Mesh {
+/**
+ * A ball with a blind socket for its stalk, centred on the origin, socket downwards. The socket
+ * runs from the underside up to `socketTop` (0 is the centre). Opposite the socket a small flat is
+ * cut, so that the ball can be printed socket up, standing on the flat.
+ */
+function socketBall(radius: number, socketRadius: number, socketTop = 0, segments = 64): Mesh {
   const start = Math.asin(socketRadius / radius);
-  const profile: Vec2[] = [[0, 0], [socketRadius, 0], [socketRadius, -radius * Math.cos(start)]];
+  const flat = Math.acos(0.955);
+  const profile: Vec2[] = [[0, socketTop], [socketRadius, socketTop], [socketRadius, -radius * Math.cos(start)]];
   const rings = Math.round(segments / 2);
-  for (let i = 1; i < rings; i++) {
-    const a = -Math.PI / 2 + start + ((Math.PI - start) * i) / rings;
+  const from = -Math.PI / 2 + start;
+  const to = Math.PI / 2 - flat;
+  for (let i = 1; i <= rings; i++) {
+    const a = from + ((to - from) * i) / rings;
     profile.push([radius * Math.cos(a), radius * Math.sin(a)]);
   }
-  profile.push([0, radius]);
+  profile.push([0, radius * Math.sin(to)]);
   return lathe(profile, segments);
 }
 
@@ -106,15 +113,15 @@ export function buildKit(layout: Layout, scale = 1): Kit {
   const wheel = (id: string): Wheel => layout.byId.get(id)!;
 
   // ---- frame
-  add('Frame', 'Base plate', ['base']);
-  add('Frame', 'Pillar, lower', ['pillarLower0'], { count: 4, also: ['pillarLower1', 'pillarLower2', 'pillarLower3'], note: 'The pin on top passes through the bridge into the upper pillar.' });
+  add('Frame', 'Base plate', ['base'], { note: 'Four pins stand on it for the feet of the lower pillars.' });
+  add('Frame', 'Pillar, lower', ['pillarLower0'], { count: 4, also: ['pillarLower1', 'pillarLower2', 'pillarLower3'], note: 'A socket in the foot takes the pin on the base plate; the pin on top passes through the bridge into the socket of the upper pillar.' });
   add('Frame', 'Bridge', ['bridge']);
-  add('Frame', 'Pillar, upper', ['pillarUpper0'], { count: 4, also: ['pillarUpper1', 'pillarUpper2', 'pillarUpper3'] });
+  add('Frame', 'Pillar, upper', ['pillarUpper0'], { count: 4, also: ['pillarUpper1', 'pillarUpper2', 'pillarUpper3'], note: 'The pin on top enters the deck plate.' });
   add('Frame', 'Deck plate', ['deck'], { note: 'The engraving of the screen model is not in the solid.' });
   add('Frame', 'Sun post', ['post'], { note: `Or a ${DESIGN.postDiameter * scale} mm rod, ${(eclipticZ() + DESIGN.basePlateThickness) * scale} mm long.` });
   add('Frame', 'Idler post', ['idlerPost'], { note: `Or a ${DESIGN.idlerPostDiameter * scale} mm rod.` });
   add('Frame', 'Idler post collar', ['idlerCollar']);
-  add('Frame', 'Fixed tube', ['fixedTube'], { note: 'Pressed into the bridge. It must not turn.' });
+  add('Frame', 'Fixed tube', ['fixedTube'], { note: 'Pressed and glued into the bridge. It must not turn.' });
   add('Frame', 'Crank bearing', ['bearing0'], { count: 2, also: ['bearing1'], note: 'Glued to the base plate along the crank line.' });
 
   // ---- crank
@@ -131,7 +138,7 @@ export function buildKit(layout: Layout, scale = 1): Kit {
   for (const w of layout.wheels) {
     if (w.axis !== 'centre') continue;
     add(w.tellurion ? 'Tellurion' : 'Gearbox wheels', `${trainName(w.train)} wheel ${w.role.toUpperCase()} ${w.teeth}T`, [w.id],
-      { note: w.body === 'frame' ? 'A press fit on the fixed tube.' : `A press fit on the ${w.body === 'month' ? 'month' : cap(w.body)} tube.` });
+      { note: w.body === 'frame' ? 'Fixed on the fixed tube: press and glue.' : `A friction fit on the ${w.body === 'month' ? 'month' : cap(w.body)} tube.` });
   }
 
   // ---- idler clusters
@@ -151,11 +158,12 @@ export function buildKit(layout: Layout, scale = 1): Kit {
     }
     add('Arms', `${cap(b)} arm`, [`${b}Arm`], { note: 'Arm, collar and stalk in one piece. A friction fit on its tube, so the planet can be set by hand.' });
     used.add(`${b}Ball`);
-    addMesh('Bodies', cap(b), socketBall(DESIGN.ballDiameter[b] / 2, DESIGN.stalkDiameter / 2 + 0.05), { flip: true, note: 'Printed socket up.' });
+    addMesh('Bodies', cap(b), socketBall(DESIGN.ballDiameter[b] / 2, DESIGN.stalkDiameter / 2 + 0.05), { flip: true, note: 'Printed socket up, standing on a small flat cut for the purpose.' });
   }
-  add('Bodies', "Saturn's ring", ['saturnRing'], { note: 'Glued round Saturn.' });
+  used.add('saturnRing');
+  addMesh('Bodies', "Saturn's ring", saturnRingFlat(), { note: 'Printed flat. Its three spokes are glued into Saturn at a tilt.' });
   used.add('sun');
-  addMesh('Bodies', 'Sun', socketBall(DESIGN.ballDiameter.sun / 2, DESIGN.postDiameter / 2 + 0.05), { flip: true });
+  addMesh('Bodies', 'Sun', socketBall(DESIGN.ballDiameter.sun / 2, DESIGN.postDiameter / 2 + 0.05), { flip: true, note: 'Printed socket up, standing on its flat.' });
 
   // ---- tellurion
   for (const body of ['tiltCluster', 'moonCluster'] as const) {
@@ -170,7 +178,7 @@ export function buildKit(layout: Layout, scale = 1): Kit {
     add('Tellurion', `Moon's nodes cluster, wheel B${b.teeth} with sleeve`, ['node.b', 'nodeClusterSleeve'], { note: 'Turns on the stud. The moon cluster slides on before wheel C.' });
     used.add('node.c');
     const sleeve = DESIGN.nodeClusterSleeveDiameter / 2;
-    addMesh('Tellurion', `Moon's nodes cluster, wheel C${c.teeth}`, wheelSolid(c, { ...wheelStyle(c), boreRadius: sleeve + 0.03, hubRadius: sleeve + DESIGN.tellurionHubWall }, PRINT_DETAIL),
+    addMesh('Tellurion', `Moon's nodes cluster, wheel C${c.teeth}`, wheelSolid(c, { ...wheelStyle(c, PRINT_DETAIL), boreRadius: sleeve + PRINT_DETAIL.press, hubRadius: sleeve + DESIGN.tellurionHubWall }, PRINT_DETAIL),
       { note: 'A press fit on the top of the node cluster sleeve.' });
   }
   add('Tellurion', `Earth's axis wheel D${wheel('tilt.d').teeth}`, ['tilt.d'], { note: "A press fit on the earth's axis shaft." });
@@ -180,17 +188,18 @@ export function buildKit(layout: Layout, scale = 1): Kit {
     used.add('earthBall');
     used.add('earthPin');
     const r = DESIGN.ballDiameter.earth / 2;
-    const pin = transformed(cylinder(0.45, -r - 2.2, r + 2.2, 12), rotationY((DESIGN.obliquity * Math.PI) / 180));
-    const globe = merge([socketBall(r, DESIGN.earthAxisDiameter / 2 + 0.05), pin]);
-    addMesh('Bodies', 'Earth', globe, { flip: true, note: 'The polar pin leans 23.4 degrees from the socket; set the lean towards the June solstice.' });
+    // The polar axis is two stubs outside the ball; a pin through the middle would cross the socket.
+    const stubs = transformed(merge([cylinder(0.45, r - 0.6, r + 2.2, 12), cylinder(0.45, -r - 2.2, -r + 0.6, 12)]), rotationY((DESIGN.obliquity * Math.PI) / 180));
+    const globe = merge([socketBall(r, DESIGN.earthAxisDiameter / 2 + 0.05, -EARTH_SOCKET_TOP), stubs]);
+    addMesh('Bodies', 'Earth', globe, { flip: true, note: 'Needs supports: the polar stubs lean 23.4 degrees from the socket. Set the lean towards the June solstice.' });
   }
   add('Tellurion', `Moon wheel D${wheel('moon.d').teeth}`, ['moon.d'], { note: "A press fit on the moon's sleeve." });
   add('Tellurion', "Moon's sleeve and arm", ['moonSleeveTube', 'moonArm'], { flip: true });
   add('Tellurion', `Node wheel D${wheel('node.d').teeth}`, ['node.d'], { note: 'A press fit on the node sleeve.' });
-  add('Tellurion', 'Node sleeve and inclined ring', ['nodeSleeveTube', 'nodeRing', 'nodeMark'], { flip: true, note: 'The ring is tipped 5.1 degrees; print with supports.' });
+  add('Tellurion', 'Node sleeve and inclined ring', ['nodeSleeveTube', 'nodeRing', 'nodeMark'], { flip: true, note: 'Needs supports: the ring is tipped 5.1 degrees to the sleeve.' });
   add('Tellurion', "Moon's stalk", ['moonStalk'], { note: 'Slides freely in the hole of the moon arm; its foot rides on the inclined ring.' });
   used.add('moonBall');
-  addMesh('Bodies', 'Moon', socketBall(DESIGN.ballDiameter.moon / 2, 0.85), { flip: true });
+  addMesh('Bodies', 'Moon', socketBall(DESIGN.ballDiameter.moon / 2, 0.85), { flip: true, note: 'Printed socket up, standing on its flat.' });
 
   const missed = parts.filter((p) => !used.has(p.id)).map((p) => p.id);
   if (missed.length) throw new Error(`kit: parts left out: ${missed.join(', ')}`);
@@ -244,11 +253,14 @@ function readme(kit: Kit, layout: Layout): string {
   lines.push('');
   lines.push('READ THIS FIRST');
   lines.push('This kit was generated by the Wheelwork app from the tooth counts on its workbench. Every');
-  lines.push('file is a closed solid and every gear pair was checked for interference in the plane');
-  lines.push('(table below), but THE KIT HAS NOT BEEN PRINTED OR ASSEMBLED BY ITS AUTHOR. Fits are');
-  lines.push('nominal: press fits are 0.03 mm over size on radius, running fits 0.2 to 0.25 mm. Expect');
-  lines.push('to ream, sand or scale holes for your printer. The tellurion parts are small; a resin');
-  lines.push('printer, or a larger scale, suits them better than a 0.4 mm nozzle at scale 1.');
+  lines.push('file is a closed solid and every pair of spur wheels was checked for interference in the');
+  lines.push('plane (table below; the bevel pair of the crank is not in that table), but THE KIT HAS NOT');
+  lines.push('BEEN PRINTED OR ASSEMBLED BY ITS AUTHOR. Fits are nominal. Fixed fits (a wheel on its tube,');
+  lines.push('a pin in its socket) are drawn size for size: a printed hole comes out a little small,');
+  lines.push('which makes the press; ream it if it is too tight and glue it if it is loose. Running');
+  lines.push('fits have 0.2 to 0.25 mm on radius. The tellurion parts are small; a resin printer, or a');
+  lines.push('larger scale, suits them better than a 0.4 mm nozzle at scale 1. The Earth, and the node');
+  lines.push('sleeve with its inclined ring, have no flat face to stand on and need supports.');
   lines.push('');
   lines.push('TOOTH COUNTS (wheel A meshes B, C meshes D; B and C are one cluster)');
   for (const id of TRAIN_IDS) {
@@ -277,7 +289,7 @@ function readme(kit: Kit, layout: Layout): string {
   lines.push('');
   lines.push('ASSEMBLY, FROM THE BOTTOM');
   lines.push(' 1. Press the sun post and the idler post into the base plate; stand the four lower pillars');
-  lines.push('    in their holes. Glue the two crank bearings on the crank line, slide the crank shaft');
+  lines.push('    on its pins. Glue the two crank bearings on the crank line, slide the crank shaft');
   lines.push('    through them and fix the pinion on its inner end.');
   lines.push(" 2. Fix the crank wheel on the bottom of Mercury's tube, teeth down, and lower the tube over");
   lines.push('    the sun post until the wheel meshes with the pinion. Drop the collar on the idler post.');
@@ -286,8 +298,8 @@ function readme(kit: Kit, layout: Layout): string {
   lines.push('    tubes is Mercury, Venus, month tube, then the bridge with the fixed tube, then Earth,');
   lines.push('    Mars, Jupiter and Saturn. Every tube stands on the hub of the wheel below it.');
   lines.push(' 4. After the month tube and its wheels, fit the bridge over the pillar pins, with the fixed');
-  lines.push('    tube pressed into it, then the upper pillars. The month-to-earth cluster passes between');
-  lines.push('    the arms of the bridge.');
+  lines.push('    tube glued into it, then stand the upper pillars on the same pins. The month-to-earth');
+  lines.push('    cluster passes between the arms of the bridge.');
   lines.push(' 5. Put on the deck plate, then the arms of Saturn, Jupiter and Mars.');
   lines.push(" 6. The earth's arm carries the tellurion. Press the stud into it. On the earth post go, in");
   lines.push("    order, the axis shaft with its wheel, the moon's sleeve with its wheel and arm, and the");

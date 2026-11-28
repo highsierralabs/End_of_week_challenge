@@ -42,10 +42,17 @@ export interface Detail {
   arcTol: number;
   /** Total backlash per wheel (circular thinning at the pitch circle), millimetres. */
   backlash: number;
+  /**
+   * Radial allowance of a fixed fit (a wheel on its tube, a tube in a plate). On screen a hair of
+   * clearance keeps the two surfaces from lying in each other. In the print kit it is zero: hole
+   * and seat are drawn the same size, a printed hole comes out a little small, and that makes the
+   * press.
+   */
+  press: number;
 }
 
-export const SCREEN_DETAIL: Detail = { flankPoints: 5, filletPoints: 3, arcTol: 0.03, backlash: 0.06 };
-export const PRINT_DETAIL: Detail = { flankPoints: 10, filletPoints: 6, arcTol: 0.01, backlash: 0.12 };
+export const SCREEN_DETAIL: Detail = { flankPoints: 5, filletPoints: 3, arcTol: 0.03, backlash: 0.06, press: 0.03 };
+export const PRINT_DETAIL: Detail = { flankPoints: 10, filletPoints: 6, arcTol: 0.01, backlash: 0.12, press: 0 };
 
 const TAU = Math.PI * 2;
 
@@ -123,11 +130,11 @@ export function wheelSolid(w: Wheel, style: WheelStyle, detail: Detail): Mesh {
 }
 
 /** How each wheel is made, from what it sits on. */
-export function wheelStyle(w: Wheel): WheelStyle {
+export function wheelStyle(w: Wheel, detail: Detail = SCREEN_DETAIL): WheelStyle {
   if (w.tellurion) {
-    return { hubRadius: w.seatRadius + DESIGN.tellurionHubWall, boreRadius: w.seatRadius + 0.03, boss: 0.25, crossings: true };
+    return { hubRadius: w.seatRadius + DESIGN.tellurionHubWall, boreRadius: w.seatRadius + detail.press, boss: 0.25, crossings: true };
   }
-  return { hubRadius: w.seatRadius + DESIGN.hubWall, boreRadius: w.seatRadius + 0.03, boss: HUB_BOSS, crossings: true };
+  return { hubRadius: w.seatRadius + DESIGN.hubWall, boreRadius: w.seatRadius + detail.press, boss: HUB_BOSS, crossings: true };
 }
 
 // ---------------------------------------------------------------- the crank's bevel pair
@@ -191,10 +198,16 @@ function turned(mesh: Mesh, angle: number): Mesh {
   return transformed(mesh, rotationZ(angle));
 }
 
-function pillarProfile(z0: number, z1: number): Vec2[] {
+/** Radius of the pins that join the pillars to the plates and to each other, and the depth of their sockets. */
+export const PILLAR_PIN = 2;
+const PILLAR_SOCKET = 3;
+
+/** A turned pillar from z0 to z1 with a socket in its foot for the pin of whatever it stands on. */
+function pillarProfile(z0: number, z1: number, detail: Detail): Vec2[] {
   const r = DESIGN.pillarDiameter / 2;
   const f = r + 2.2;
-  const pts: Vec2[] = [[0, z0], [f, z0], [f, z0 + 1.2], [r + 0.8, z0 + 2], [r + 0.8, z0 + 3]];
+  const hole = PILLAR_PIN + detail.press;
+  const pts: Vec2[] = [[0, z0 + PILLAR_SOCKET], [hole, z0 + PILLAR_SOCKET], [hole, z0], [f, z0], [f, z0 + 1.2], [r + 0.8, z0 + 2], [r + 0.8, z0 + 3.4]];
   // An entasis: the column swells slightly at mid height, like a turned baluster.
   const n = 10;
   for (let i = 0; i <= n; i++) {
@@ -233,12 +246,12 @@ export function bridgeOutline(): Ring {
   }, 1440);
 }
 
-function plateHoles(centreRadius: number, detail: Detail): Ring[] {
+function plateHoles(centreRadius: number, detail: Detail, pillars: boolean): Ring[] {
   const [ix, iy] = [DESIGN.centreDistance * Math.cos(DESIGN.idlerAngle), DESIGN.centreDistance * Math.sin(DESIGN.idlerAngle)];
-  const holes: Ring[] = [circle(centreRadius, segs(centreRadius, detail)), circle(DESIGN.idlerPostDiameter / 2 + 0.03, 32, ix, iy)];
-  for (let i = 0; i < DESIGN.pillarAngles.length; i++) {
+  const holes: Ring[] = [circle(centreRadius, segs(centreRadius, detail)), circle(DESIGN.idlerPostDiameter / 2 + detail.press, 32, ix, iy)];
+  for (let i = 0; pillars && i < DESIGN.pillarAngles.length; i++) {
     const [x, y] = pillarXY(i);
-    holes.push(circle(2, 24, x, y));
+    holes.push(circle(PILLAR_PIN + detail.press, 24, x, y));
   }
   return holes;
 }
@@ -279,7 +292,11 @@ export function buildParts(layout: Layout, options: PartsOptions = {}): Part[] {
   const baseT = DESIGN.basePlateThickness;
   add({
     id: 'base', name: 'Base plate', body: 'frame', material: 'brassDark', layer: 0,
-    mesh: extrude({ outer: circle(DESIGN.plateRadius, segs(DESIGN.plateRadius, detail)), holes: plateHoles(DESIGN.postDiameter / 2 + 0.03, detail) }, -baseT, 0),
+    // The base plate carries a pin for the foot of each pillar, so that plate and pillars both print flat.
+    mesh: merge([
+      extrude({ outer: circle(DESIGN.plateRadius, segs(DESIGN.plateRadius, detail)), holes: plateHoles(DESIGN.postDiameter / 2 + detail.press, detail, false) }, -baseT, 0),
+      ...DESIGN.pillarAngles.map((_, i) => at(cylinder(PILLAR_PIN, -0.5, PILLAR_SOCKET - 0.4, 20), ...pillarXY(i))),
+    ]),
   });
   add({
     id: 'post', name: 'Sun post', body: 'frame', material: 'steel', layer: 0,
@@ -295,17 +312,18 @@ export function buildParts(layout: Layout, options: PartsOptions = {}): Part[] {
   });
   add({
     id: 'idlerCollar', name: 'Idler post collar', body: 'frame', material: 'brass', layer: 0,
-    mesh: at(tube(DESIGN.clusterHubDiameter / 2, DESIGN.idlerPostDiameter / 2 + 0.03, 0, levelZ(1) - HUB_BOSS - 0.15, 32), idlerX, idlerY),
+    mesh: at(tube(DESIGN.clusterHubDiameter / 2, DESIGN.idlerPostDiameter / 2 + detail.press, 0, levelZ(1) - HUB_BOSS - 0.15, 32), idlerX, idlerY),
   });
   for (let i = 0; i < DESIGN.pillarAngles.length; i++) {
     const [x, y] = pillarXY(i);
     add({
       id: `pillarLower${i}`, name: 'Pillar', body: 'frame', material: 'brass', layer: 0,
-      mesh: at(merge([lathe(pillarProfile(0, bridge.bottom), 40), cylinder(1.97, -baseT, bridge.top + 2, 20)]), x, y),
+      // Its pin passes through the bridge into the socket of the upper pillar.
+      mesh: at(merge([lathe(pillarProfile(0, bridge.bottom, detail), 40), cylinder(PILLAR_PIN, bridge.bottom - 0.5, bridge.top + PILLAR_SOCKET - 0.4, 20)]), x, y),
     });
     add({
       id: `pillarUpper${i}`, name: 'Pillar', body: 'frame', material: 'brass', layer: 5.5,
-      mesh: at(merge([lathe(pillarProfile(bridge.top, deck.bottom), 40), cylinder(1.97, deck.bottom - 0.2, deck.top, 20)]), x, y),
+      mesh: at(merge([lathe(pillarProfile(bridge.top, deck.bottom, detail), 40), cylinder(PILLAR_PIN, deck.bottom - 0.5, deck.top, 20)]), x, y),
     });
   }
   const fixedOuter = nestOuterDiameter('fixed') / 2;
@@ -313,7 +331,7 @@ export function buildParts(layout: Layout, options: PartsOptions = {}): Part[] {
     id: 'bridge', name: 'Bridge', body: 'frame', material: 'brassDark', layer: 5.5,
     mesh: extrude({
       outer: bridgeOutline(),
-      holes: [circle(fixedOuter + 0.03, segs(fixedOuter, detail)), ...DESIGN.pillarAngles.map((_, i) => circle(2, 24, ...pillarXY(i)))],
+      holes: [circle(fixedOuter + detail.press, segs(fixedOuter, detail)), ...DESIGN.pillarAngles.map((_, i) => circle(PILLAR_PIN + detail.press, 24, ...pillarXY(i)))],
     }, bridge.bottom, bridge.top),
   });
   const fixed = tubeSpan(layout, 'fixed');
@@ -323,7 +341,7 @@ export function buildParts(layout: Layout, options: PartsOptions = {}): Part[] {
   });
   add({
     id: 'deck', name: 'Deck plate', body: 'frame', material: 'deck', layer: 13,
-    mesh: extrude({ outer: circle(DESIGN.plateRadius, segs(DESIGN.plateRadius, detail)), holes: plateHoles(nestOuterDiameter('saturn') / 2 + 0.4, detail) }, deck.bottom, deck.top),
+    mesh: extrude({ outer: circle(DESIGN.plateRadius, segs(DESIGN.plateRadius, detail)), holes: plateHoles(nestOuterDiameter('saturn') / 2 + 0.4, detail, true) }, deck.bottom, deck.top),
   });
   // Bearing blocks for the crank shaft: a block with a hole, built on its side.
   const blockRegion = (h: number) => ({
@@ -370,7 +388,7 @@ export function buildParts(layout: Layout, options: PartsOptions = {}): Part[] {
     for (const w of wheelsOf(layout, m)) {
       add({
         id: w.id, name: wheelName(w), body: m, material: 'brassWheel', wheel: w.id, layer: w.tellurion ? tellurionLayer(w.level) : w.level,
-        mesh: wheelSolid(w, wheelStyle(w), detail), anchor: [0, 0, w.z + w.face / 2],
+        mesh: wheelSolid(w, wheelStyle(w, detail), detail), anchor: [0, 0, w.z + w.face / 2],
       });
     }
     if (m === 'mercury') {
@@ -382,7 +400,7 @@ export function buildParts(layout: Layout, options: PartsOptions = {}): Part[] {
     const length = DESIGN.armLength[body];
     const hub = outer + 3.2;
     // The collar stands on the arm's upper face only, so the arm lies flat on a print bed.
-    const collar = tube(hub - 0.8, outer + 0.03, z, z + DESIGN.armThickness + ARM_HUB, segs(hub, detail));
+    const collar = tube(hub - 0.8, outer + detail.press, z, z + DESIGN.armThickness + ARM_HUB, segs(hub, detail));
     if (body === 'earth') {
       const holes = [
         circle(hub - 1.2, segs(hub, detail)),
@@ -411,8 +429,7 @@ export function buildParts(layout: Layout, options: PartsOptions = {}): Part[] {
     const ball = sphere(DESIGN.ballDiameter[body] / 2, ecl, 48);
     add({ id: `${body}Ball`, name: title(body), body, material: body, layer: ARM_LAYER[body], mesh: at(ball, length, 0), anchor: [length, 0, ecl] });
     if (body === 'saturn') {
-      const r = DESIGN.ballDiameter.saturn / 2;
-      const ring = transformed(lathe([[r * 1.25, -0.25], [r * 1.95, -0.25], [r * 1.95, 0.25], [r * 1.25, 0.25]], 72), rotationX((20 * Math.PI) / 180));
+      const ring = transformed(saturnRingFlat(), rotationX((20 * Math.PI) / 180));
       add({ id: 'saturnRing', name: "Saturn's ring", body, material: 'saturn', layer: ARM_LAYER.saturn, mesh: at(ring, length, 0, ecl) });
     }
   });
@@ -439,7 +456,7 @@ export function buildParts(layout: Layout, options: PartsOptions = {}): Part[] {
   for (const w of wheelsOf(layout, 'frame')) {
     add({
       id: w.id, name: wheelName(w), body: 'frame', material: 'brassWheel', wheel: w.id, layer: tellurionLayer(w.level),
-      mesh: wheelSolid(w, wheelStyle(w), detail), anchor: [0, 0, w.z + w.face / 2],
+      mesh: wheelSolid(w, wheelStyle(w, detail), detail), anchor: [0, 0, w.z + w.face / 2],
     });
   }
 
@@ -455,7 +472,7 @@ export function buildParts(layout: Layout, options: PartsOptions = {}): Part[] {
     for (const w of ws) {
       add({
         id: w.id, name: wheelName(w), body, material: 'brassWheel', wheel: w.id, layer: tellurionLayer(w.level),
-        mesh: wheelSolid(w, wheelStyle(w), detail), anchor: [0, 0, w.z + w.face / 2],
+        mesh: wheelSolid(w, wheelStyle(w, detail), detail), anchor: [0, 0, w.z + w.face / 2],
       });
     }
     add({
@@ -471,24 +488,26 @@ export function buildParts(layout: Layout, options: PartsOptions = {}): Part[] {
   {
     const ws = wheelsOf(layout, 'earthAxis');
     for (const w of ws) {
-      add({ id: w.id, name: wheelName(w), body: 'earthAxis', material: 'brassWheel', wheel: w.id, layer: tellurionLayer(w.level), mesh: wheelSolid(w, wheelStyle(w), detail), anchor: [0, 0, w.z + w.face / 2] });
+      add({ id: w.id, name: wheelName(w), body: 'earthAxis', material: 'brassWheel', wheel: w.id, layer: tellurionLayer(w.level), mesh: wheelSolid(w, wheelStyle(w, detail), detail), anchor: [0, 0, w.z + w.face / 2] });
     }
     add({
       id: 'earthAxisShaft', name: "Earth's axis shaft", body: 'earthAxis', material: 'steel', layer: TOP + 7,
-      mesh: cylinder(DESIGN.earthAxisDiameter / 2, armBottomZ('earth'), ecl, 24),
+      // It ends in a socket in the globe's underside, short of the centre.
+      mesh: cylinder(DESIGN.earthAxisDiameter / 2, armBottomZ('earth'), ecl - EARTH_SOCKET_TOP, 24),
     });
     // The globe leans towards the body's +X by the obliquity, and keeps that lean as the arm carries it round.
     const lean = compose(translation(0, 0, ecl), compose(rotationY((DESIGN.obliquity * Math.PI) / 180), translation(0, 0, -ecl)));
     add({ id: 'earthBall', name: 'Earth', body: 'earthAxis', material: 'earth', layer: TOP + 7, mesh: transformed(sphere(earthR, ecl, 64), lean), anchor: [0, 0, ecl] });
     add({
       id: 'earthPin', name: "Earth's polar axis", body: 'earthAxis', material: 'brass', layer: TOP + 7,
-      mesh: transformed(cylinder(0.45, ecl - earthR - 2.2, ecl + earthR + 2.2, 12), lean),
+      // Two stubs at the poles rather than a pin through the middle, which would cross the shaft's socket.
+      mesh: transformed(merge([cylinder(0.45, ecl + earthR - 0.6, ecl + earthR + 2.2, 12), cylinder(0.45, ecl - earthR - 2.2, ecl - earthR + 0.6, 12)]), lean),
     });
   }
   {
     const ws = wheelsOf(layout, 'moonSleeve');
     for (const w of ws) {
-      add({ id: w.id, name: wheelName(w), body: 'moonSleeve', material: 'brassWheel', wheel: w.id, layer: tellurionLayer(w.level), mesh: wheelSolid(w, wheelStyle(w), detail), anchor: [0, 0, w.z + w.face / 2] });
+      add({ id: w.id, name: wheelName(w), body: 'moonSleeve', material: 'brassWheel', wheel: w.id, layer: tellurionLayer(w.level), mesh: wheelSolid(w, wheelStyle(w, detail), detail), anchor: [0, 0, w.z + w.face / 2] });
     }
     const r = DESIGN.moonSleeveDiameter / 2;
     add({
@@ -503,7 +522,7 @@ export function buildParts(layout: Layout, options: PartsOptions = {}): Part[] {
   {
     const ws = wheelsOf(layout, 'nodeSleeve');
     for (const w of ws) {
-      add({ id: w.id, name: wheelName(w), body: 'nodeSleeve', material: 'brassWheel', wheel: w.id, layer: tellurionLayer(w.level), mesh: wheelSolid(w, wheelStyle(w), detail), anchor: [0, 0, w.z + w.face / 2] });
+      add({ id: w.id, name: wheelName(w), body: 'nodeSleeve', material: 'brassWheel', wheel: w.id, layer: tellurionLayer(w.level), mesh: wheelSolid(w, wheelStyle(w, detail), detail), anchor: [0, 0, w.z + w.face / 2] });
     }
     const r = DESIGN.nodeSleeveDiameter / 2;
     add({
@@ -538,6 +557,17 @@ export function buildParts(layout: Layout, options: PartsOptions = {}): Part[] {
   return parts;
 }
 
+/** How far below the globe's centre the earth's axis shaft stops. */
+export const EARTH_SOCKET_TOP = 3;
+
+/** Saturn's ring lying flat, centred on the origin: an annulus held off the ball by three spokes that reach into it. */
+export function saturnRingFlat(): Mesh {
+  const r = DESIGN.ballDiameter.saturn / 2;
+  const solids: Mesh[] = [lathe([[r * 1.25, -0.25], [r * 1.95, -0.25], [r * 1.95, 0.25], [r * 1.25, 0.25]], 72)];
+  for (let k = 0; k < 3; k++) solids.push(turned(box(r - 0.7, -0.4, -0.25, r * 1.3, 0.4, 0.25), (k / 3) * TAU));
+  return merge(solids);
+}
+
 /** The walnut drum, in two halves that part along the crank's line. */
 export function caseParts(_detail: Detail): Part[] {
   const deck = deckZ();
@@ -552,8 +582,14 @@ export function caseParts(_detail: Detail): Part[] {
     [lip, deck.bottom - 0.4], [ri, deck.bottom - 0.4],
   ];
   const a = DESIGN.crankAngle;
-  const near = revolve(profile, a - Math.PI, a, 96);
-  const far = revolve(profile, a, a + Math.PI, 96);
+  // Where the crank shaft leaves the case, on the seam, each half is cut away round it: a narrow
+  // strip of wall next to the seam is made in two pieces, one under the shaft and one over.
+  const gap = DESIGN.crankShaftDiameter / 2 + 0.7;
+  const strip = Math.asin(gap / ri);
+  const under: Vec2[] = [...profile.slice(0, 7), [ro, DESIGN.crankAxisZ - gap], [ri, DESIGN.crankAxisZ - gap]];
+  const over: Vec2[] = [[ri, DESIGN.crankAxisZ + gap], [ro, DESIGN.crankAxisZ + gap], ...profile.slice(7)];
+  const near = merge([revolve(profile, a - Math.PI, a - strip, 96), revolve(under, a - strip, a, 2), revolve(over, a - strip, a, 2)]);
+  const far = merge([revolve(under, a, a + strip, 2), revolve(over, a, a + strip, 2), revolve(profile, a + strip, a + Math.PI, 96)]);
   const anchor: readonly [number, number, number] = [0, 0, (z0 + zt) / 2];
   // Two brass stringing lines let into the wood.
   const band = (z: number): Vec2[] => [[ro - 0.6, z], [ro + 0.35, z], [ro + 0.35, z + 1.3], [ro - 0.6, z + 1.3]];

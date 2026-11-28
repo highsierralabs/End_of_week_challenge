@@ -238,24 +238,32 @@ async function run(): Promise<void> {
   section('6. The machine against the sky',
     `The machine as designed, set today (${formatDate(setJd)}), is run through time and read against the reference sky. These are measurements of what a geared model with uniform circular motion can and cannot do.`);
   {
-    // After a century the gearing error is what the drift figure says.
+    // After a century each arm, as posed, has gained on the sky's mean motion by what the drift
+    // figure says. The arm's angle comes from the exact fractions of the kinematics; the drift
+    // figure from the periods worked out in the designer: two routes to the same number.
     const turns = 36525 / (rates.value.earth * targets.period.earth);
-    const r = readMachine(poseMachine(spec, rates, setting, turns), setJd, rates, targets);
+    const pose100 = poseMachine(spec, rates, setting, turns);
+    const r = readMachine(pose100, setJd, rates, targets);
     let worst = 0;
-    for (const m of ['mercury', 'venus', 'mars', 'jupiter', 'saturn'] as const) worst = Math.max(worst, Math.abs(norm180(r.planets[m].gearing - driftPerCentury(spec, targets, m))));
-    check('Gearing error read off the posed machine after 100 years, against the drift figures', `differs by at most ${worst.toExponential(1)}°`, 'the same', worst < 1e-6);
-    check('The earth arm after 100 years (it is the calendar)', `${f(r.planets.earth.gearing, 4)}° from the mean Earth`, 'under 0.01°', Math.abs(r.planets.earth.gearing) < 0.01);
-    // Circle error: largest mean-minus-true over 60 years, against 2e + ... for Mars (10.7 degrees).
+    for (const m of ['mercury', 'venus', 'mars', 'jupiter', 'saturn'] as const) {
+      const turned = ((pose100.angle[m] - setting[m]) * 180) / Math.PI;
+      const sky = (360 * 36525) / targets.period[m];
+      worst = Math.max(worst, Math.abs(norm180(turned - sky - driftPerCentury(spec, targets, m))));
+    }
+    check('Each arm as posed after 100 years, less the sky’s mean motion, against the designer’s drift figure', `differs by at most ${worst.toExponential(1)}°`, 'the same, to rounding', worst < 1e-6);
+    const earthOff = norm180(r.planets.earth.machine - r.planets.earth.mean);
+    check('The earth arm after 100 years, against the reference Earth’s mean longitude', `${f(earthOff, 4)}° apart`, 'under 0.01° (it is the calendar)', Math.abs(earthOff) < 0.01);
+    // Circle error: what is left of the error once the gearing's part is taken out, largest over 60 years.
     let mars = 0, mercury = 0;
     for (let i = 0; i < 3000; i++) {
       const jd = setJd + i * 7.3;
       const t = (jd - setJd) / (rates.value.earth * targets.period.earth);
       const rr = readMachine(poseMachine(spec, rates, setting, t), setJd, rates, targets);
-      mars = Math.max(mars, Math.abs(rr.planets.mars.error));
-      mercury = Math.max(mercury, Math.abs(rr.planets.mercury.error));
+      mars = Math.max(mars, Math.abs(rr.planets.mars.circle));
+      mercury = Math.max(mercury, Math.abs(rr.planets.mercury.circle));
     }
-    check('Largest error of Mars in 60 years', `${f(mars, 1)}°`, 'about 10.7° (its equation of centre)', mars > 10 && mars < 11.6);
-    check('Largest error of Mercury in 60 years', `${f(mercury, 1)}°`, 'about 23.7° (its equation of centre)', mercury > 22.8 && mercury < 24.8);
+    check('Largest circle error of Mars in 60 years', `${f(mars, 1)}°`, 'about 10.7° (its equation of centre)', mars > 10 && mars < 11.6);
+    check('Largest circle error of Mercury in 60 years', `${f(mercury, 1)}°`, 'about 23.7° (its equation of centre)', mercury > 22.8 && mercury < 24.8);
     // Eclipse seasons: at every catalogue eclipse the machine's Sun should be near a node.
     let season = 0, near = 0, far = 0;
     for (const e of ECLIPSES) {
