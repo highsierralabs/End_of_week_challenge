@@ -61,7 +61,7 @@ export class SkyPanel implements Panel {
       this.table,
       this.moonBox,
       h('h3', null, 'Two kinds of error'),
-      h('p', null, 'The gearing error grows steadily: a train of whole-number teeth never has exactly the right ratio. The circle error comes and goes each orbit: the arms turn evenly, but planets speed up near the Sun and slow down far from it.'),
+      h('p', null, 'The gearing error grows steadily: a train of whole-number teeth never has exactly the right ratio. The circle error comes and goes each orbit: the arms turn evenly, but planets speed up near the Sun and slow down far from it. For Jupiter and Saturn it also holds a slow swing of over nine centuries, from their pull on each other.'),
       this.drift,
     );
   }
@@ -110,7 +110,7 @@ export class SkyPanel implements Panel {
     clear(this.table);
     this.table.append(h('thead', null, h('tr', null,
       h('th', null, ''), h('th', { title: 'Heliocentric longitude shown by the machine' }, 'Machine'), h('th', { title: 'True heliocentric longitude' }, 'Sky'),
-      h('th', { title: 'Machine minus sky' }, 'Error'), h('th', { title: 'Lost or gained by the gearing since the machine was set' }, 'Gearing'), h('th', { title: 'The cost of uniform circular motion at this moment' }, 'Circle'))));
+      h('th', { title: 'Machine minus sky' }, 'Error'), h('th', { title: 'Lost or gained by the gearing since the machine was set' }, 'Gearing'), h('th', { title: 'What steady circular motion cannot follow, at this moment' }, 'Circle'))));
     const row = (name: string, colour: string, p: BodyReading) => h('tr', null,
       h('th', { scope: 'row' }, h('i.dot', { style: `background:${colour}` }), name),
       h('td', null, zodiac(p.machine)), h('td', null, zodiac(p.truth)),

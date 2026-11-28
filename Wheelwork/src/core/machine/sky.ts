@@ -49,9 +49,16 @@ export interface BodyReading {
   mean: number;
   /** machine - truth, in (-180, 180]. */
   error: number;
-  /** machine - mean: what the gearing alone has lost or gained since the machine was set. */
+  /**
+   * What the gearing alone has lost or gained since the machine was set: the angle the arm has
+   * turned, less the angle the body's mean motion covers in the same time.
+   */
   gearing: number;
-  /** mean - truth: what uniform circular motion costs at this moment. */
+  /**
+   * The rest of the error: what steady circular motion cannot follow. Mostly the ellipse (the
+   * equation of centre); for Jupiter and Saturn also the slow swing of their mutual pull, and
+   * whatever of either was already present on the day the machine was set to mean places.
+   */
   circle: number;
 }
 
@@ -96,8 +103,12 @@ export const ECLIPSE_LIMITS = {
   lunarLatitude: 1.0,
   /** How close to exact new or full the Moon must be for the machine to call it, degrees of elongation. */
   syzygy: 6,
-  /** The Sun within this of a node makes an eclipse season. */
-  season: 17,
+  /**
+   * The Sun within this of a node makes an eclipse season: the textbook major limit for solar
+   * eclipses is 18.5 degrees. The machine's Sun and node are mean ones, each up to 2 degrees from
+   * the true, so a few real eclipses fall just outside its seasons (the validation page counts them).
+   */
+  season: 18.5,
 } as const;
 
 const PHASES = ['New Moon', 'Waxing crescent', 'First quarter', 'Waxing gibbous', 'Full Moon', 'Waning gibbous', 'Last quarter', 'Waning crescent'] as const;
@@ -119,16 +130,18 @@ export function latitudeOnInclinedOrbit(fromNode: number, inclination: number = 
 
 /** Read the machine at a pose and set it beside the sky at the date it shows. */
 export function readMachine(pose: MachinePose, setJd: number, rates: Rates, targets: Targets): Reading {
-  const jd = setJd + pose.turns * daysPerTurn(rates, targets);
+  const days = pose.turns * daysPerTurn(rates, targets);
+  const jd = setJd + days;
+  // Degrees gained on the sky's mean motion since the setting: turned by the gears, less turned by the sky.
+  const gained = (rate: number, period: number) => norm180(360 * (rate * pose.turns - days / period));
   const planets = {} as Record<Body, BodyReading>;
   for (const b of BODIES) {
     const machine = norm360(pose.angle[b] / DEG);
     const state = planetState(b, jd);
     const mean = norm360(meanLongitudeUnwrapped(b, jd));
-    planets[b] = {
-      machine, truth: state.lon, mean,
-      error: norm180(machine - state.lon), gearing: norm180(machine - mean), circle: norm180(mean - state.lon),
-    };
+    const error = norm180(machine - state.lon);
+    const gearing = gained(rates.value[b], targets.period[b]);
+    planets[b] = { machine, truth: state.lon, mean, error, gearing, circle: norm180(error - gearing) };
   }
   const m = moonState(jd);
   const machineMoon = norm360(pose.angle.moonSleeve / DEG);
@@ -137,9 +150,11 @@ export function readMachine(pose: MachinePose, setJd: number, rates: Rates, targ
   const elongation = norm360(machineMoon - machineSun);
   const latitude = latitudeOnInclinedOrbit(machineMoon - machineNode);
   const meanMoon = norm360(moonMeanLongitudeUnwrapped(jd));
+  const moonError = norm180(machineMoon - m.lon);
+  const moonGearing = gained(rates.value.moonSleeve, targets.period.month);
   const moon: MoonReading = {
     machine: machineMoon, truth: m.lon, mean: meanMoon,
-    error: norm180(machineMoon - m.lon), gearing: norm180(machineMoon - meanMoon), circle: norm180(meanMoon - m.lon),
+    error: moonError, gearing: moonGearing, circle: norm180(moonError - moonGearing),
     node: machineNode, nodeTruth: m.node, nodeError: norm180(machineNode - m.node),
     elongation, elongationTruth: norm360(m.lon - sunGeocentricLongitude(jd)),
     latitude, latitudeTruth: m.lat,

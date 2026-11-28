@@ -4,11 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Wheelwork: validation</title>
+  <meta name="description" content="Every claim Wheelwork rests on, measured in your browser against JPL Horizons, NASA's eclipse catalogue, closed forms and brute force.">
+  <meta name="theme-color" content="#0b0908">
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./src/validation/validation.css">
 </head>
 <body>
+  <header>
+    <h1>Wheelwork <small>Validation: what the orrery rests on, measured here</small></h1>
+    <p>These checks run now, in your browser, on the same code that draws and turns the <a href="./">machine</a>. Each sets a number the app computes beside one it did not make: a position fetched from JPL, an eclipse from NASA's catalogue, a closed-form value, an exhaustive search, or an identity that has to hold exactly.</p>
+    <div id="summary" role="status">Running the checks&hellip;</div>
+  </header>
   <main id="report"></main>
+  <footer>
+    <p>Reference data: JPL Horizons (ephemeris DE441) and Eclipse Predictions by Fred Espenak, NASA's GSFC, fetched on 27 November 2026 and shipped with this page. The planets' elements are E. M. Standish's, from JPL Solar System Dynamics; the lunar series is that of J. Meeus, Astronomical Algorithms, as carried in the ERFA library.</p>
+  </footer>
   <script type="module" src="./src/validation/main.ts"></script>
 </body>
 </html>
