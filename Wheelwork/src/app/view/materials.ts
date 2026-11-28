@@ -29,7 +29,7 @@ vec2 wwWood(vec3 pos) {
   float rings = 0.5 + 0.5 * sin(r * 1.35 + 2.5 * wwFbm(q * vec3(0.03, 0.5, 0.5)));
   float fibre = wwFbm(q * vec3(0.35, 9.0, 9.0));
   float pores = smoothstep(0.62, 0.9, wwNoise(q * vec3(1.2, 28.0, 28.0)));
-  float tone = clamp(pow(rings, 1.3) * 0.34 + fibre * 0.62 - pores * 0.2 + 0.08, 0.0, 1.0);
+  float tone = clamp(pow(rings, 1.3) * 0.2 + fibre * 0.74 - pores * 0.2 + 0.1, 0.0, 1.0);
   return vec2(tone, fibre);
 }
 `;
@@ -74,15 +74,15 @@ export class Materials {
   constructor(deckSize: number) {
     const metal = (color: number, roughness: number, extra: THREE.MeshPhysicalMaterialParameters = {}) =>
       new THREE.MeshPhysicalMaterial({ color, metalness: 1, roughness, ...extra });
-    this.map.set('brass', metal(0xcda04c, 0.2));
-    this.map.set('brassWheel', metal(0xd4a650, 0.27));
-    this.map.set('brassDark', metal(0x94713a, 0.4));
+    this.map.set('brass', metal(0xd9ae56, 0.2));
+    this.map.set('brassWheel', metal(0xe0b65c, 0.23));
+    this.map.set('brassDark', metal(0xa27e44, 0.38));
     this.map.set('steel', metal(0xc2c7cf, 0.28));
     this.sun = metal(0xffd47e, 0.16, { emissive: 0xffb548, emissiveIntensity: 0 });
     this.map.set('gilt', this.sun);
     const deck = deckTextures(deckSize);
     this.textures.push(deck.map, deck.bump);
-    this.map.set('deck', metal(0xd2a654, 0.36, { map: deck.map, bumpMap: deck.bump, bumpScale: 1.6 }));
+    this.map.set('deck', metal(0xcfa350, 0.44, { map: deck.map, bumpMap: deck.bump, bumpScale: 1.6, envMapIntensity: 0.7 }));
     this.map.set('walnut', woodMaterial({ dark: 0x1e1008, light: 0x5c351b, scale: 0.3, axis: [1, 0.2, 0.06], roughness: 0.4, clearcoat: 0.6 }));
     this.map.set('ebony', new THREE.MeshPhysicalMaterial({ color: 0x15100d, roughness: 0.3, clearcoat: 0.7, clearcoatRoughness: 0.2 }));
     this.map.set('ivory', new THREE.MeshPhysicalMaterial({ color: 0xe9e0cb, roughness: 0.4, clearcoat: 0.3 }));

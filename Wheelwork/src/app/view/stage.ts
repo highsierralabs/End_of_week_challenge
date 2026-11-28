@@ -26,7 +26,7 @@ interface ViewPreset {
 
 const BALLS: ReadonlySet<MaterialId> = new Set<MaterialId>(['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'moon']);
 const EXPLODE_GAP = 9;
-const BACKGROUND = new THREE.Color(0x0b0908);
+const BACKGROUND = new THREE.Color(0x060505);
 const BACKGROUND_LAMP = new THREE.Color(0x020202);
 
 const ENV = 1.25;
@@ -48,7 +48,7 @@ function studio(): THREE.Scene {
     s.add(m);
   };
   panel(16, 11, lit(0xfff0da, 16), 9, -12, 15);     // key softbox, warm, high on the viewer's right
-  panel(30, 30, lit(0xfff6ea, 1.7), 0, 0.01, 24);    // a broad ceiling glow
+  panel(30, 30, lit(0xfff6ea, 1.2), 0, 0.01, 24);    // a broad ceiling glow
   panel(5, 14, lit(0xcddcff, 5), -18, 7, 6);         // cool strip on the far left
   panel(20, 2.5, lit(0xffe6c4, 9), 2, 20, 8);        // a long warm strip behind
   panel(3, 3, lit(0xffffff, 26), -8, -16, 11);       // a small hard light for sparkle on teeth
@@ -122,7 +122,10 @@ export class Stage {
     this.controls.maxDistance = 1700;
     this.controls.maxPolarAngle = Math.PI * 0.497;
     this.controls.zoomSpeed = 0.8;
-    this.controls.addEventListener('start', () => { this.tween = null; });
+    // Until the visitor takes hold, the camera drifts slowly round the machine.
+    this.controls.autoRotate = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.controls.autoRotateSpeed = -0.5;
+    this.controls.addEventListener('start', () => { this.tween = null; this.controls.autoRotate = false; });
 
     // Key light: warm, high and to one side, with a shadow frustum that just covers the machine.
     this.key = new THREE.DirectionalLight(0xfff0dc, 3.0);
@@ -300,10 +303,10 @@ export class Stage {
     const top = deckZ().top;
     const ecl = eclipticZ();
     switch (name) {
-      case 'whole': return { position: [420, -670, 420], target: [0, 0, top - 30], caseOpen: 0, explode: 0 };
+      case 'whole': return { position: [420, -670, 420], target: [0, 0, top - 48], caseOpen: 0, explode: 0 };
       case 'train': return { position: [500, -210, 200], target: [6, 0, top * 0.5 + 6], caseOpen: 1, explode: 0 };
       case 'exploded': return { position: [560, -760, 420], target: [0, 0, top * 0.5 + 120], caseOpen: 1, explode: 1 };
-      case 'tellurion': return { position: [-150, 62, 48], target: [0, 8, ecl - 15], caseOpen: 0, explode: 0, follow: true };
+      case 'tellurion': return { position: [-118, 84, 66], target: [0, 4, ecl - 12], caseOpen: 0, explode: 0, follow: true };
       case 'above': return { position: [0, -8, 840], target: [0, 0, top], caseOpen: 0, explode: 0 };
       case 'crank': return { position: [-560, -330, 250], target: [-40, 0, 62], caseOpen: 0, explode: 0 };
       case 'sky': return { position: [0, -500, 250], target: [0, 0, ecl], caseOpen: 0, explode: 0 };
@@ -414,13 +417,13 @@ export class Stage {
 
     // Lamp mode: the room goes dark and the Sun lights the planets.
     const k = this.lamp;
-    this.scene.environmentIntensity = ENV * (1 - k) + 0.1 * k;
+    this.scene.environmentIntensity = ENV * (1 - k) + 0.2 * k;
     this.key.intensity = 3.0 * (1 - k);
     this.rim.intensity = 0.7 * (1 - k);
-    this.fill.intensity = 0.35 * (1 - k) + 0.03 * k;
+    this.fill.intensity = 0.35 * (1 - k) + 0.06 * k;
     this.key.castShadow = k < 0.98;
     this.sunLight.visible = k > 0.01;
-    this.sunLight.intensity = 5 * k;
+    this.sunLight.intensity = 8 * k;
     this.sunLight.position.z = eclipticZ() + this.explode * EXPLODE_GAP * (this.meshes.get('sun')?.userData.part as Part).layer;
     this.materials.sun.emissiveIntensity = 2.4 * k;
     (this.scene.background as THREE.Color).copy(BACKGROUND).lerp(BACKGROUND_LAMP, k);

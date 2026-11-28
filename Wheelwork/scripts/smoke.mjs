@@ -78,6 +78,14 @@ try {
     check(!boot.error && boot.parts > 90, `desktop: boots in ${Date.now() - t0} ms with ${boot.parts} parts at ${boot.quality} quality${boot.error ? ` (${ascii(boot.error)})` : ''}`);
     const pic = await picture(page);
     check(pic.mean > 8 && pic.spread > 12, `desktop: a picture is drawn (mean ${pic.mean.toFixed(1)}, spread ${pic.spread.toFixed(1)})`);
+    const drift0 = await W(page, () => window.wheelwork.stage.camera.position.toArray());
+    await settle(page, 500);
+    const drift1 = await W(page, () => window.wheelwork.stage.camera.position.toArray());
+    check(Math.hypot(drift0[0] - drift1[0], drift0[1] - drift1[1]) > 0.2, 'desktop: the camera drifts round the machine until it is taken hold of');
+    await page.click('.views button:has-text("Sound")');
+    await settle(page, 200);
+    const snd = await W(page, () => ({ on: window.wheelwork.app.sound.on, state: window.wheelwork.app.sound.ctx?.state }));
+    check(snd.on && snd.state === 'running', `desktop: sound switches on (${snd.state})`);
     const date = await page.textContent('.brand .date');
     check(/\d{4}/.test(date ?? ''), `desktop: the header shows a date (${ascii(date)})`);
 

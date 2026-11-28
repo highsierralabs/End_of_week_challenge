@@ -56,12 +56,13 @@ function start(): void {
   // Deep links, mostly for screenshots and tests.
   const view = params.get('view') as ViewName | null;
   if (view) app.setView(view, 0);
+  if (params.get('still')) stage.controls.autoRotate = false;
   if (params.get('lamp')) { app.setLamp(true); stage.lamp = 1; }
   if (params.get('turns')) model.setTurns(Number(params.get('turns')));
   const tab = params.get('tab');
   if (tab === 'tour' || tab === 'sky' || tab === 'workbench' || tab === 'print' || tab === 'about') app.showTab(tab);
   if (params.get('stop')) app.tour.go(Number(params.get('stop')) - 1);
-  if (params.get('ui') === '0') document.getElementById('ui')!.style.display = 'none';
+  if (params.get('ui') === '0') { document.getElementById('ui')!.style.display = 'none'; app.layout(); }
 
   canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); fatal('The graphics context was lost. Reload the page to carry on.'); });
 

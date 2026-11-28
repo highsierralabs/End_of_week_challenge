@@ -274,11 +274,11 @@ export function deskTexture(): THREE.CanvasTexture {
     for (let x = 0; x < size; x++) {
       const dx = (x - size / 2) / (size / 2), dy = (y - size / 2) / (size / 2);
       const r = Math.hypot(dx, dy);
-      const pool = Math.exp(-r * r * 22);
+      const pool = Math.exp(-r * r * 30);
       const grain = 0.86 + 0.28 * hash(x, y) * (0.6 + 0.4 * valueNoise(x / 3, y / 3));
-      const k = (0.08 + 0.92 * pool) * grain;
+      const k = (0.015 + 0.985 * pool) * grain;
       const o = (y * size + x) * 4;
-      img.data[o] = 58 * k; img.data[o + 1] = 46 * k; img.data[o + 2] = 38 * k; img.data[o + 3] = 255;
+      img.data[o] = 64 * k; img.data[o + 1] = 50 * k; img.data[o + 2] = 40 * k; img.data[o + 3] = 255;
     }
   }
   g.putImageData(img, 0, 0);

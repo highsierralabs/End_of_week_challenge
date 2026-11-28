@@ -5,6 +5,7 @@ import { type Wheel } from '../../core/machine/layout';
 import { bevelSeat, type Part, trainName } from '../../core/machine/parts';
 import { type TrainId } from '../../core/machine/spec';
 import { type Model } from '../model';
+import { Sound } from '../sound';
 import { type Stage, type ViewName } from '../view/stage';
 import { clear, fmt, h } from './dom';
 import { AboutPanel } from './about';
@@ -58,6 +59,8 @@ export class App {
   private playButton!: HTMLButtonElement;
   private lampButton!: HTMLButtonElement;
   private caseButton!: HTMLButtonElement;
+  private soundButton!: HTMLButtonElement;
+  readonly sound = new Sound();
   private speedSelect!: HTMLSelectElement;
   private crankDial!: SVGElement | HTMLElement;
   private tooltip!: HTMLElement;
@@ -101,7 +104,8 @@ export class App {
     views.append(h('span.sep'));
     this.caseButton = h('button', { type: 'button', title: 'Open or close the walnut case', 'aria-pressed': 'false', onclick: () => this.setCase(this.stage.caseTarget < 0.5) }, 'Case');
     this.lampButton = h('button', { type: 'button', title: 'Put out the room lights and light the Sun', 'aria-pressed': 'false', onclick: () => this.setLamp(this.stage.lampTarget < 0.5) }, 'Sun lamp');
-    views.append(this.caseButton, this.lampButton);
+    this.soundButton = h('button', { type: 'button', title: 'Hear the teeth of the crank pinion', 'aria-pressed': 'false', onclick: () => { this.sound.setOn(!this.sound.on); this.syncButtons(); } }, 'Sound');
+    views.append(this.caseButton, this.lampButton, this.soundButton);
 
     // Transport.
     this.playButton = h('button.play', { type: 'button', title: 'Run or stop the machine (space)', onclick: () => this.toggle() });
@@ -216,6 +220,7 @@ export class App {
   layout(): void {
     const closed = this.drawer.classList.contains('closed');
     document.body.classList.toggle('sheet-closed', closed);
+    if (this.root.style.display === 'none') { this.stage.setInset(0, 0); return; }
     const sheet = matchMedia('(max-width: 820px)').matches;
     const r = this.drawer.getBoundingClientRect();
     if (sheet) this.stage.setInset(0, closed ? 42 : r.height);
@@ -223,6 +228,7 @@ export class App {
   }
 
   setView(name: ViewName, seconds?: number): void {
+    this.stage.controls.autoRotate = false;
     this.stage.setView(name, seconds);
     this.syncButtons();
   }
@@ -241,6 +247,7 @@ export class App {
     for (const [id, b] of this.viewButtons) b.setAttribute('aria-pressed', String(id === this.stage.view));
     this.caseButton.setAttribute('aria-pressed', String(this.stage.caseTarget > 0.5));
     this.lampButton.setAttribute('aria-pressed', String(this.stage.lampTarget > 0.5));
+    this.soundButton.setAttribute('aria-pressed', String(this.sound.on));
   }
 
   play(index: number = this.speedIndex, direction: number = this.direction): void {
@@ -303,6 +310,7 @@ export class App {
       // The model holds the machine inside the span the reference astronomy covers.
       if (this.model.atLimit) this.stop();
     }
+    this.sound.update(this.model.turns, this.model.spec.bevel.crank, now);
     this.stage.frame(dt);
     if (this.dirty && now - this.lastRefresh > 90) {
       this.lastRefresh = now;
