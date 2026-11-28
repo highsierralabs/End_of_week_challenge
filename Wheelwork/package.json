@@ -1,0 +1,38 @@
+{
+  "name": "wheelwork",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Wheelwork: a brass clockwork orrery in the browser whose gear trains you can count, change, check against the sky and 3D print.",
+  "license": "MIT",
+  "homepage": "https://highsierralabs.github.io/End_of_week_challenge/wheelwork/",
+  "type": "module",
+  "engines": {
+    "node": ">=24.14.1 <25"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "earcut": "3.2.4",
+    "fflate": "0.8.3",
+    "three": "0.187.0"
+  },
+  "devDependencies": {
+    "@types/earcut": "3.2.4",
+    "@types/node": "24.19.2",
+    "@types/three": "0.187.0",
+    "eslint": "10.14.0",
+    "playwright": "1.64.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1",
+    "vite": "8.3.5",
+    "vitest": "5.1.0"
+  }
+}
