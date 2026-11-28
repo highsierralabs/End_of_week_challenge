@@ -19,7 +19,8 @@ Run as `/end-of-week-challenge`, Claude:
    questions on ambition, your material and the look. Round two has three follow-ups on the chosen direction.
 3. **Builds on its own**: no check-ins, one commit per unit of work, tested in a real browser on the production build
    served from a subfolder.
-4. **Ships**: a README with a lead GIF, third-party notices, a manifest entry with a card picture and clip, the gate,
+4. **Ships**: a README with a lead GIF and a closing build cost (time, tokens per agent, the metered cost and the
+   weekly meter), third-party notices, a manifest entry with a card picture and clip, the gate,
    a release tag and one push, which redeploys the site. Then it opens the live pages to confirm they work.
 5. **Reports** what it built and why, what it verified, what is unfinished and the usage at start and finish.
 

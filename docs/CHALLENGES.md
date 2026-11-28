@@ -84,7 +84,9 @@ does, is the stricter test.
 
 ## Releasing
 
-1. The challenge folder has a README that says what the build is, how to run it and what was verified.
+1. The challenge folder has a README that says what the build is, how to run it and what was verified. A build run
+   by the skill ends its README with a `## Build cost` section: time, tokens per agent, the metered cost and the
+   weekly meter, as the skill's section 6 sets out (Lightbox is the first; Cascade and Drumhead predate the rule).
 2. `THIRD-PARTY-NOTICES.md` lists any third-party code, data or assets the build ships.
 3. The manifest entry (with its card image and the README's lead clip) and the root README's list are added.
 4. The gate passes, and its tuple line goes into the body of the last commit before the push

@@ -49,6 +49,8 @@ $ARGUMENTS
   reset time). Hold back roughly the last tenth of the budget for the release steps in
   section 6. A smaller build that is finished, verified and live beats a larger one that is
   not.
+- Note the start time and the usage figures before the first question. The README's build cost
+  (section 6) and the closeout report start from them.
 
 ## 2. The seven questions
 
@@ -133,13 +135,39 @@ answers opened up that you cannot settle from sensible defaults.
 Commit locally as you go, and **do not push until the challenge is finished**: a push to `main`
 rebuilds and redeploys the whole public site.
 
-When it is finished, follow "Releasing" in `docs/CHALLENGES.md`: README, third-party notices,
+When it is finished, follow "Releasing" in `docs/CHALLENGES.md`: README ending with its build
+cost (below), third-party notices,
 manifest entry with a card image and the README's lead GIF as its `clip` (a 16:9 crop of it
 if it is another shape; see the `clip` row in `docs/CHALLENGES.md`), `node tools/gate.mjs`
 passing, the gate tuple in the last commit's body, an annotated tag `<slug>-v1.0.0`, then
 `git push --follow-tags`. Running this skill is the operator's standing approval for that one
 push. Watch the Pages run, then open the index page and your challenge on the live site and
 confirm both work.
+
+**Build cost.** The README ends with a `## Build cost` section: what the run took, from Claude
+Code's own records. `Lightbox/README.md` and `Wheelwork/README.md` show the form. Write it last,
+just before the release commit, so it ships with the README. Its figures stop when you write it:
+say when that was and which release steps were still to come.
+
+- Sum the main session's transcript and every subagent's, counting each API response once.
+  `node Lightbox/scripts/build-cost.mjs <session transcript .jsonl> [<usage log>] --until <ISO time>`
+  does it. Transcripts are under `~/.claude/projects/<project>/`, named by session id, with the
+  subagents' in `<session id>/subagents/`. It reads only counts and timestamps. Run it
+  where it is rather than copying it into your folder. If it is missing (a fork without Lightbox),
+  sum the transcripts the same way yourself.
+- First table: start date and time, elapsed wall clock, model time summed over the agents, the
+  model or models with their ids, API responses, output tokens, input tokens (uncached / written to
+  cache / read from cache), the cost at API prices as Claude Code metered it, and the weekly meter
+  at the start and when you wrote the section. Take the metered cost from the source the local
+  notes name. If there is none, write "not metered" and do not price the tokens yourself.
+- Second table, one row per agent, each subagent named by what it did: API responses, output,
+  cache writes, cache reads, first to last response.
+- Then "How to read these" notes, at least these: the dollar figure is an estimate on a
+  subscription, not a bill; the weekly meter is the account's, so it is an upper bound if other
+  sessions ran; and anything left out is named as not counted: work by another model or service
+  (such as a Codex review), the machine's own work (GPU renders, test runs, Blender), and the
+  Pages deploy.
+- Numbers and times only. No session ids, transcript paths or transcript text in the README.
 
 Two cases where you hold the push and ask instead:
 
@@ -151,6 +179,7 @@ Two cases where you hold the push and ask instead:
 ## 7. Closeout
 
 End with a short report: what you built and why you chose it, the live URL, what you verified
-and how, what is unfinished or uncertain, and the usage figures at start and finish. If the
+and how, what is unfinished or uncertain, the usage figures at start and finish, and the build cost's
+headline figures. If the
 operator keeps a memory note for this series, update it with the new build's name, tag and
 date.
