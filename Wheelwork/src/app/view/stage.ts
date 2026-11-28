@@ -225,6 +225,7 @@ export class Stage {
       this.meshes.set(part.id, mesh);
       this.body(part.body).add(mesh);
     }
+    this.lastExplode = -1;
     this.applyPhases();
     this.applyHighlights();
   }
@@ -304,7 +305,7 @@ export class Stage {
       case 'exploded': return { position: [560, -760, 420], target: [0, 0, top * 0.5 + 120], caseOpen: 1, explode: 1 };
       case 'tellurion': return { position: [-150, 62, 48], target: [0, 8, ecl - 15], caseOpen: 0, explode: 0, follow: true };
       case 'above': return { position: [0, -8, 840], target: [0, 0, top], caseOpen: 0, explode: 0 };
-      case 'crank': return { position: [-380, -300, 150], target: [-70, 0, 40], caseOpen: 0, explode: 0 };
+      case 'crank': return { position: [-560, -330, 250], target: [-40, 0, 62], caseOpen: 0, explode: 0 };
       case 'sky': return { position: [0, -500, 250], target: [0, 0, ecl], caseOpen: 0, explode: 0 };
     }
   }

@@ -118,8 +118,13 @@ export class App {
     fillDate();
     const go = () => {
       const y = Math.max(-2999, Math.min(3000, Math.round(Number(year.value) || 0)));
-      const jd = jdFromCalendar(y, Number(month.value), Math.max(1, Math.min(31, Number(day.value) || 1)));
-      this.glideTo(jd);
+      const m = Number(month.value);
+      // A day the month does not have becomes its last day.
+      let d = Math.max(1, Math.min(31, Math.round(Number(day.value) || 1)));
+      while (d > 28 && calendarFromJd(jdFromCalendar(y, m, d)).month !== m) d--;
+      day.value = String(d);
+      year.value = String(y);
+      this.glideTo(jdFromCalendar(y, m, d));
     };
     const goForm = h('form.goto', { onsubmit: (e: Event) => { e.preventDefault(); go(); } },
       h('span.label', null, 'Turn to'), day, month, year, h('button', { type: 'submit', title: 'Turn the crank until the machine shows this date' }, 'Go'));
@@ -295,9 +300,8 @@ export class App {
       if (g.t >= 1) this.glide = null;
     } else if (this.rate !== 0) {
       this.model.setTurns(this.model.turns + (this.rate / this.model.daysPerTurn) * dt);
-      // Stay inside the span the reference astronomy covers.
-      const c = calendarFromJd(this.model.jd);
-      if (c.year < -2999 || c.year > 3000) this.stop();
+      // The model holds the machine inside the span the reference astronomy covers.
+      if (this.model.atLimit) this.stop();
     }
     this.stage.frame(dt);
     if (this.dirty && now - this.lastRefresh > 90) {

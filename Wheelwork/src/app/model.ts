@@ -74,13 +74,14 @@ export class Model {
     const jd = this.jd;
     this.spec = cloneSpec(spec);
     this.derive();
-    this.turns = (jd - this.setJd) / this.daysPerTurn;
+    this.turns = (Math.max(Model.MIN_JD, Math.min(Model.MAX_JD, jd)) - this.setJd) / this.daysPerTurn;
     this.emit('spec');
   }
 
   /** Set the machine afresh on a date: every arm goes to its mean place and the crank count to zero. */
   resetTo(jd: number): void {
-    this.setJd = jd;
+    this.setJd = Math.max(Model.MIN_JD, Math.min(Model.MAX_JD, jd));
+    jd = this.setJd;
     this.turns = 0;
     this.setting = settingFor(jd);
     this.phases = wheelPhases(this.layout, this.setting);
@@ -96,9 +97,21 @@ export class Model {
     return this.setJd + this.turns * this.daysPerTurn;
   }
 
+  /** The reference astronomy covers 3000 BC to AD 3000; the machine is not run outside it. */
+  static readonly MIN_JD = jdFromCalendar(-2999, 1, 1);
+  static readonly MAX_JD = jdFromCalendar(3000, 12, 31);
+
+  /** True when the machine stands at either end of the span it may be run over. */
+  get atLimit(): boolean {
+    return this.jd <= Model.MIN_JD || this.jd >= Model.MAX_JD;
+  }
+
   setTurns(turns: number): void {
-    if (turns === this.turns) return;
-    this.turns = turns;
+    const lo = (Model.MIN_JD - this.setJd) / this.daysPerTurn;
+    const hi = (Model.MAX_JD - this.setJd) / this.daysPerTurn;
+    const clamped = Math.max(lo, Math.min(hi, turns));
+    if (clamped === this.turns) return;
+    this.turns = clamped;
     this.emit('time');
   }
 

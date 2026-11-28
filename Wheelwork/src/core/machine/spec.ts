@@ -65,7 +65,9 @@ export interface Limits {
 export const DEFAULT_LIMITS: Limits = { minTeeth: 12, maxTeeth: 96, minModule: 1.0 };
 export const MAX_MODULE = 3.2;
 
-const clusterRoot = DESIGN.idlerPostDiameter / 2 + DESIGN.postClearance + DESIGN.hubWall;
+// A cluster wheel's root circle must stand clear of the cluster's hub, which is also what keeps
+// the tips of the wheel it meshes with off that hub (tip to root clearance is a quarter module).
+const clusterRoot = DESIGN.clusterHubDiameter / 2 + 0.3;
 
 export function stepRule(id: StepId, limits: Limits = DEFAULT_LIMITS): StepRule {
   const { inner, outer } = stepMembers(id);

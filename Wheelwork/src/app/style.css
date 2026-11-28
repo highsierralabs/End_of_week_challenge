@@ -166,7 +166,9 @@ details summary { cursor: pointer; color: var(--brass); margin: 8px 0; }
   .drawer .body { padding: 12px 14px 22px; }
   .transport { left: 8px; right: 8px; bottom: calc(46vh + 8px); max-width: none; padding: 6px 8px; }
   .transport .row:last-child { display: none; }
-  .views { left: 8px; right: 8px; bottom: calc(46vh + 70px); max-width: none; }
+  .views { left: 8px; right: 8px; bottom: calc(46vh + 70px); max-width: none; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .views button { flex: none; }
+  .views .sep { display: none; }
   .views button { font-size: 12px; padding: 0.3em 0.55em; }
   body.sheet-closed .transport { bottom: 50px; }
   body.sheet-closed .views { bottom: 112px; }

@@ -50,6 +50,8 @@ export interface RuleResult {
   ok: boolean;
   train?: TrainId;
   text: string;
+  /** A rule the machine can be built and run without: breaking it shows wrong astronomy, not broken mechanics. */
+  advice?: boolean;
 }
 
 export interface Layout {
@@ -152,7 +154,7 @@ export function buildLayout(spec: MachineSpec, limits: Limits = DEFAULT_LIMITS):
   for (const id of ['tilt', 'moon'] as const) {
     const s = spec.tellurion[id];
     const unit = s.a * s.c === s.b * s.d;
-    rules.push({ id: `${id}.unit`, train: id, ok: unit, text: unit ? 'Ratio is exactly one.' : 'Ratio must be exactly one (a x c = b x d).' });
+    rules.push({ id: `${id}.unit`, train: id, ok: unit, advice: true, text: unit ? 'Ratio is exactly one.' : 'Ratio should be exactly one (a x c = b x d).' });
   }
   // Wheels on the earth post must pass inside Mars's stalk.
   for (const w of wheels) {
@@ -165,7 +167,7 @@ export function buildLayout(spec: MachineSpec, limits: Limits = DEFAULT_LIMITS):
   const bevelOk = bevelTip < DESIGN.centreDistance - DESIGN.clusterHubDiameter / 2 - 1;
   rules.push({ id: 'bevel.reach', ok: bevelOk, text: bevelOk ? 'The crank wheel clears the idler post.' : 'The crank wheel would strike the idler post.' });
 
-  return { spec, wheels, byId, rules, ok: rules.every((r) => r.ok) };
+  return { spec, wheels, byId, rules, ok: rules.every((r) => r.ok || r.advice) };
 }
 
 /** The wheels fixed on one body, lowest first. */

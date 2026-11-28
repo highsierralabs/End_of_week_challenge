@@ -78,15 +78,16 @@ export function matingAngle(thetaA: number, zA: number, zB: number, phi: number)
 }
 
 /**
- * The fixed angle of each wheel on its body that puts every mesh in mesh. A wheel is a friction
- * fit on its tube, as the arms are, so its place on the body is free: wheels a and c sit at zero
- * and their mates take what the mesh asks for.
+ * The fixed angle of each wheel on its body that puts every mesh in mesh. A cluster is one rigid
+ * piece, so its two wheels (b and c) sit at zero on it, as they are printed. The wheels they mesh
+ * with (a and d) are friction fits on their tubes and sleeves, as the arms are, so their place on
+ * the body is free and takes what the mesh asks for.
  */
 export function wheelPhases(layout: Layout, setting: Setting): Map<string, number> {
   const out = new Map<string, number>();
   const armAngle = setting.earth;
   for (const w of layout.wheels) {
-    if (w.role !== 'a' && w.role !== 'c') continue;
+    if (w.role !== 'b' && w.role !== 'c') continue;
     const mate = layout.byId.get(w.mate)!;
     const carrier = w.tellurion ? armAngle : 0;
     const [wx, wy] = axisPosition(w.axis);

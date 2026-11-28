@@ -220,7 +220,7 @@ async function run(): Promise<void> {
     check(`Solver against brute force (${firsts.length * seconds.length} trains tried)`, `${(Math.abs(best.error) * 1e6).toFixed(3)} parts in a million`, `${(brute * 1e6).toFixed(3)} parts in a million`, Math.abs(Math.abs(best.error) - brute) < 1e-12);
     const conv = convergents(77708431 / 2640858).slice(0, 4).map((c) => `${c.p}/${c.q}`).join(', ');
     check('Convergents of Huygens’s ratio for Saturn, 77708431/2640858', conv, '29/1, 59/2, 147/5, 206/7', conv === '29/1, 59/2, 147/5, 206/7');
-    const pi = bestPair(Math.PI, 5, 400);
+    const pi = bestPair(Math.PI, 5, 400)!;
     check('Best single pair for π with at most 400 teeth', `${pi.p}/${pi.q}`, '355/113', pi.p === 355 && pi.q === 113);
     const bad = layout.rules.filter((r) => !r.ok).length;
     check('Design rules broken by the designed machine', String(bad), '0', bad === 0);

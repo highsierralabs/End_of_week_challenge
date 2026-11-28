@@ -520,13 +520,14 @@ export function buildParts(layout: Layout, options: PartsOptions = {}): Part[] {
     add({ id: 'nodeRing', name: 'Inclined ring', body: 'nodeSleeve', material: 'brassDark', layer: TOP + 6, mesh: transformed(merge(flat), tip), anchor: [0, 0, ringTop] });
     // A small pointer at the ascending node.
     add({
-      id: 'nodeMark', name: 'Ascending node', body: 'nodeSleeve', material: 'gilt', layer: TOP + 6,
+      id: 'nodeMark', name: 'Ascending node', body: 'nodeSleeve', material: 'brass', layer: TOP + 6,
       mesh: transformed(at(sphere(0.9, 0, 16), rm + 1.7, 0, -0.6), tip),
     });
   }
   add({
     id: 'moonStalk', name: "Moon's stalk", body: 'moonStalk', material: 'steel', layer: TOP + 6.5,
-    mesh: at(merge([cylinder(0.8, ringTop, ecl, 16), sphere(1.1, ringTop + 0.6, 16)]), DESIGN.moonOrbitRadius, 0),
+    // The foot is a ball that stands on the ring's upper face.
+    mesh: at(merge([cylinder(0.8, ringTop + 1.1, ecl, 16), sphere(1.1, ringTop + 1.1, 16)]), DESIGN.moonOrbitRadius, 0),
   });
   add({
     id: 'moonBall', name: 'Moon', body: 'moonStalk', material: 'moon', layer: TOP + 6.5,
@@ -554,9 +555,14 @@ export function caseParts(_detail: Detail): Part[] {
   const near = revolve(profile, a - Math.PI, a, 96);
   const far = revolve(profile, a, a + Math.PI, 96);
   const anchor: readonly [number, number, number] = [0, 0, (z0 + zt) / 2];
+  // Two brass stringing lines let into the wood.
+  const band = (z: number): Vec2[] => [[ro - 0.6, z], [ro + 0.35, z], [ro + 0.35, z + 1.3], [ro - 0.6, z + 1.3]];
+  const bands = (from: number, to: number) => merge([revolve(band(z0 + 19), from, to, 96), revolve(band(zt - 17), from, to, 96)]);
   return [
     { id: 'caseNear', name: 'Walnut case', body: 'caseNear', material: 'walnut', mesh: near, layer: 0, anchor },
     { id: 'caseFar', name: 'Walnut case', body: 'caseFar', material: 'walnut', mesh: far, layer: 0, anchor },
+    { id: 'caseNearInlay', name: 'Walnut case', body: 'caseNear', material: 'brass', mesh: bands(a - Math.PI, a), layer: 0, anchor },
+    { id: 'caseFarInlay', name: 'Walnut case', body: 'caseFar', material: 'brass', mesh: bands(a, a + Math.PI), layer: 0, anchor },
   ];
 }
 

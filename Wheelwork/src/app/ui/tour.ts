@@ -36,7 +36,7 @@ const STOPS: Stop[] = [
     body: (app) => {
       const m = app.model;
       return [
-        p(`One turn of the crank is ${fmt(m.daysPerTurn, 2)} days: about a month. In that turn the Moon goes ${fmt(Math.abs(m.rates.value.moonSleeve), 3)} times round the Earth and Mercury covers a third of its orbit.`),
+        p(`One turn of the crank is ${fmt(m.daysPerTurn, 2)} days: about a month. In that turn the Moon goes ${fmt(Math.abs(m.rates.value.moonSleeve), 2)} times round the Earth against the stars, and Mercury covers ${fmt(m.rates.value.mercury, 2)} of its orbit.`),
         p(`Saturn needs ${fmt(1 / m.rates.value.saturn, 0)} turns to go round once. The Earth takes ${fmt(1 / m.rates.value.earth, 2)}: the Earth's arm is this machine's calendar, and the inner ring engraved on the deck is read against it.`),
         p('The crank drives a bevel pinion, which turns a bevel wheel on the bottom of Mercury\'s tube. Everything else takes its motion from there.'),
       ];

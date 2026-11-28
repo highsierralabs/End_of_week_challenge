@@ -110,13 +110,32 @@ function candidate(p: Pair, q: Pair, target: number): Candidate {
  * The `keep` trains closest to `target`, best first. Trains with the same ratio are listed once,
  * the one with the coarsest teeth standing for all.
  */
+function gcdInt(a: number, b: number): number {
+  let x = a;
+  let y = b;
+  while (y !== 0) { [x, y] = [y, x % y]; }
+  return x;
+}
+
+/** A train's ratio as a reduced fraction, so that trains with the same ratio are recognised exactly. */
+function ratioKey(c: Candidate): string {
+  const n = c.b * c.d;
+  const d = c.a * c.c;
+  const g = gcdInt(n, d);
+  return `${n / g}/${d / g}`;
+}
+
+const finest = (c: Candidate): number => Math.min(c.moduleFirst, c.moduleSecond);
+
 export function solveStep(target: number, rule: StepRule, keep = 12): Candidate[] {
   const firsts = feasiblePairs(rule.first);
   const seconds = feasiblePairs(rule.second);
   if (!firsts.length || !seconds.length) return [];
-  const best: Candidate[] = [];
+  // One entry for each distinct ratio: the train with the coarsest teeth that makes it.
+  let found = new Map<string, Candidate>();
   let worst = Infinity;
   const ratios = seconds.map((s) => s.ratio);
+  const byError = (x: Candidate, y: Candidate) => Math.abs(x.error) - Math.abs(y.error) || finest(y) - finest(x);
   for (const p of firsts) {
     const want = target / p.ratio;
     // Binary search for the first second-pair with ratio >= want, then look both ways.
@@ -129,26 +148,20 @@ export function solveStep(target: number, rule: StepRule, keep = 12): Candidate[
     for (const dir of [-1, 1]) {
       for (let k = dir < 0 ? lo - 1 : lo; k >= 0 && k < seconds.length; k += dir) {
         const c = candidate(p, seconds[k]!, target);
-        const e = Math.abs(c.error);
-        if (best.length >= keep * 6 && e >= worst) break;
-        best.push(c);
-        if (best.length > keep * 12) {
-          best.sort((x, y) => Math.abs(x.error) - Math.abs(y.error));
-          best.length = keep * 6;
-          worst = Math.abs(best[best.length - 1]!.error);
+        // Errors only grow walking away from the nearest pair, so the first one outside the kept set ends the walk.
+        if (Math.abs(c.error) > worst) break;
+        const key = ratioKey(c);
+        const had = found.get(key);
+        if (!had || finest(c) > finest(had)) found.set(key, c);
+        if (found.size > keep * 12) {
+          const kept = [...found.values()].sort(byError).slice(0, keep * 6);
+          worst = Math.abs(kept[kept.length - 1]!.error);
+          found = new Map(kept.map((v) => [ratioKey(v), v]));
         }
       }
     }
   }
-  best.sort((x, y) => Math.abs(x.error) - Math.abs(y.error) || Math.min(y.moduleFirst, y.moduleSecond) - Math.min(x.moduleFirst, x.moduleSecond));
-  const out: Candidate[] = [];
-  for (const c of best) {
-    const same = out.find((o) => Math.abs(o.ratio - c.ratio) <= 1e-15 * Math.abs(c.ratio));
-    if (same) continue;
-    out.push(c);
-    if (out.length >= keep) break;
-  }
-  return out;
+  return [...found.values()].sort(byError).slice(0, keep);
 }
 
 /**

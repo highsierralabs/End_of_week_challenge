@@ -84,8 +84,15 @@ export interface EclipseReading {
   sunFromNode: number;
   /** The Sun is close enough to a node for eclipses to happen at this new or full moon. */
   season: boolean;
-  /** What the machine predicts at this instant. */
+  /**
+   * What the machine shows at this instant: an eclipse when it is within a few degrees of a new or
+   * full Moon whose latitude, taken at the exact new or full, is inside the limit.
+   */
   now: 'solar' | 'lunar' | null;
+  /** Days from now to the machine's nearer new or full Moon (negative when it has passed). */
+  daysToSyzygy: number;
+  /** The machine Moon's latitude at that new or full Moon, degrees. */
+  latitudeAtSyzygy: number;
 }
 
 export interface Reading {
@@ -165,12 +172,19 @@ export function readMachine(pose: MachinePose, setJd: number, rates: Rates, targ
   let sunFromNode = norm180(machineSun - machineNode);
   if (sunFromNode > 90) sunFromNode -= 180;
   if (sunFromNode < -90) sunFromNode += 180;
-  const nearNew = Math.min(elongation, 360 - elongation) < ECLIPSE_LIMITS.syzygy;
-  const nearFull = Math.abs(elongation - 180) < ECLIPSE_LIMITS.syzygy;
+  // The verdict is taken at the exact new or full Moon, not at this instant: the Moon's latitude
+  // changes by half a degree in the few hours either side.
+  const perDay = (rate: number) => (360 * rate) / daysPerTurn(rates, targets);
+  const toNew = norm180(elongation);
+  const toFull = norm180(elongation - 180);
+  const isNew = Math.abs(toNew) <= Math.abs(toFull);
+  const off = isNew ? toNew : toFull;
+  const elongationRate = perDay(rates.value.moonSleeve - rates.value.earth);
+  const daysToSyzygy = elongationRate !== 0 ? -off / elongationRate : 0;
+  const latitudeAtSyzygy = latitudeOnInclinedOrbit(machineMoon - machineNode + perDay(rates.value.moonSleeve - rates.value.nodeSleeve) * daysToSyzygy);
   let now: EclipseReading['now'] = null;
-  if (nearNew && Math.abs(latitude) < ECLIPSE_LIMITS.solarLatitude) now = 'solar';
-  else if (nearFull && Math.abs(latitude) < ECLIPSE_LIMITS.lunarLatitude) now = 'lunar';
-  return { jd, planets, moon, eclipse: { sunFromNode, season: Math.abs(sunFromNode) < ECLIPSE_LIMITS.season, now } };
+  if (Math.abs(off) < ECLIPSE_LIMITS.syzygy && Math.abs(latitudeAtSyzygy) < (isNew ? ECLIPSE_LIMITS.solarLatitude : ECLIPSE_LIMITS.lunarLatitude)) now = isNew ? 'solar' : 'lunar';
+  return { jd, planets, moon, eclipse: { sunFromNode, season: Math.abs(sunFromNode) < ECLIPSE_LIMITS.season, now, daysToSyzygy, latitudeAtSyzygy } };
 }
 
 /**

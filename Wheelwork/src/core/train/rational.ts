@@ -93,16 +93,17 @@ export function convergents(x: number, max = 12): Convergent[] {
 
 /**
  * The best fraction p/q to x with both p and q in [min, max]: the answer to "one pair of wheels,
- * no more than `max` teeth each". Exhaustive, so there is nothing to prove about it.
+ * no more than `max` teeth each". Exhaustive, so there is nothing to prove about it. Null when
+ * the ratio is outside what such a pair can make.
  */
-export function bestPair(x: number, min: number, max: number): Convergent {
-  let best: Convergent = { p: min, q: min, error: Infinity };
+export function bestPair(x: number, min: number, max: number): Convergent | null {
+  let best: Convergent | null = null;
   for (let q = min; q <= max; q++) {
     const centre = Math.round(x * q);
     for (const p of [centre - 1, centre, centre + 1]) {
       if (p < min || p > max) continue;
       const error = p / q - x;
-      if (Math.abs(error) < Math.abs(best.error)) best = { p, q, error };
+      if (!best || Math.abs(error) < Math.abs(best.error)) best = { p, q, error };
     }
   }
   return best;

@@ -7,6 +7,10 @@ import {
 } from '../../src/core/machine/spec';
 import { bestPair, convergents } from '../../src/core/train/rational';
 import { feasiblePairs, solveStep } from '../../src/core/train/solver';
+import { poseMachine } from '../../src/core/machine/pose';
+import { ECLIPSE_LIMITS, readMachine } from '../../src/core/machine/sky';
+import { tellurionRule } from '../../src/core/machine/spec';
+import { DESIGN } from '../../src/core/machine/design';
 
 // Round figures, good enough to exercise the designer; the app takes its targets from the
 // reference astronomy.
@@ -22,7 +26,7 @@ describe('continued fractions', () => {
     expect(c.slice(0, 4)).toEqual(['29/1', '59/2', '147/5', '206/7']);
   });
   it('finds the best single pair exhaustively', () => {
-    const best = bestPair(Math.PI, 5, 400);
+    const best = bestPair(Math.PI, 5, 400)!;
     expect(`${best.p}/${best.q}`).toBe('355/113');
   });
 });
@@ -108,5 +112,56 @@ describe('designed machine', () => {
 
   it('round-trips through a share link', () => {
     expect(decodeSpec(encodeSpec(spec), spec)).toEqual(spec);
+  });
+});
+
+describe('review fixes', () => {
+  it('lists distinct ratios, each by its coarsest train', () => {
+    const rule = tellurionRule('tilt');
+    const list = solveStep(1, rule, 8);
+    expect(list.length).toBe(8);
+    expect(new Set(list.map((c) => c.ratio)).size).toBe(8);
+    expect(list[0]!.error).toBe(0);
+    // Brute force for the coarsest exact one-to-one train.
+    let coarsest = 0;
+    for (const p of feasiblePairs(rule.first)) for (const q of feasiblePairs(rule.second)) {
+      if (p.second * q.second === p.first * q.first) coarsest = Math.max(coarsest, Math.min(p.module, q.module));
+    }
+    expect(Math.min(list[0]!.moduleFirst, list[0]!.moduleSecond)).toBeCloseTo(coarsest, 12);
+  });
+
+  it('keeps cluster wheels clear of the cluster hub', () => {
+    for (const id of STEP_IDS) {
+      const rule = stepRule(id, { minTeeth: 10, maxTeeth: 160, minModule: 0.5 });
+      for (const p of feasiblePairs(rule.first)) {
+        const tipOfCentral = p.module * (p.first / 2 + 1);
+        expect(tipOfCentral).toBeLessThan(DESIGN.centreDistance - DESIGN.clusterHubDiameter / 2);
+      }
+    }
+  });
+
+  it('gives both wheels of a cluster the same place on it', () => {
+    const layout = buildLayout(designMachine(TARGETS));
+    const setting = zeroSetting();
+    setting.earth = 1.234; setting.mars = 2.5; setting.moonSleeve = 0.7;
+    const phases = wheelPhases(layout, setting);
+    for (const w of layout.wheels) if (w.role === 'b' || w.role === 'c') expect(phases.get(w.id)).toBe(0);
+  });
+
+  it('judges an eclipse at the exact new Moon, not near it', () => {
+    const layout = buildLayout(designMachine(TARGETS));
+    const rates = solveRates(layout);
+    const deg = Math.PI / 180;
+    // Sun at 21, Moon at 16, node at 0: five degrees short of new, latitude 1.42 now but 1.9 at conjunction.
+    const setting = zeroSetting();
+    setting.earth = (21 + 180) * deg; setting.moonSleeve = 16 * deg; setting.nodeSleeve = 0;
+    const r = readMachine(poseMachine(layout.spec, rates, setting, 0), 2461000, rates, TARGETS);
+    expect(Math.abs(r.moon.latitude)).toBeLessThan(ECLIPSE_LIMITS.solarLatitude);
+    expect(Math.abs(r.eclipse.latitudeAtSyzygy)).toBeGreaterThan(ECLIPSE_LIMITS.solarLatitude);
+    expect(r.eclipse.daysToSyzygy).toBeGreaterThan(0.3);
+    expect(r.eclipse.now).toBe(null);
+    // Moved so that conjunction falls at the node, it is an eclipse.
+    setting.earth = (5 + 180) * deg; setting.moonSleeve = 2 * deg;
+    expect(readMachine(poseMachine(layout.spec, rates, setting, 0), 2461000, rates, TARGETS).eclipse.now).toBe('solar');
   });
 });

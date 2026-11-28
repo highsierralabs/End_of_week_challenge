@@ -140,7 +140,7 @@ export class WorkbenchPanel implements Panel {
       h('td', { class: driftClass(nd) }, `${signed(nd, 3)}° a century`)));
     t.append(tb);
     this.summary.append(t);
-    if (!model.layout.ok) this.summary.append(h('p.fault', null, 'This machine breaks its own rules: ', model.layout.rules.filter((r) => !r.ok).map((r) => r.text).join(' ')));
+    if (!model.layout.ok) this.summary.append(h('p.fault', null, 'This machine breaks its own rules: ', model.layout.rules.filter((r) => !r.ok && !r.advice).map((r) => r.text).join(' ')));
   }
 
   private wanted(id: TrainId): number {
@@ -154,7 +154,7 @@ export class WorkbenchPanel implements Panel {
     const spec = cloneSpec(model.spec);
     setTrain(spec, id, step);
     const layout = buildLayout(spec, PHYSICAL_LIMITS);
-    const faults = layout.rules.filter((r) => !r.ok && r.train === id && !r.id.endsWith('.unit'));
+    const faults = layout.rules.filter((r) => !r.ok && !r.advice && r.train === id);
     if (faults.length) {
       // Keep it on the bench until it fits; the machine stays as it was.
       this.draft = { id, step };
@@ -255,7 +255,9 @@ export class WorkbenchPanel implements Panel {
         h('summary', null, 'Why two pairs of wheels and not one?'),
         h('p', null, 'One pair can only make a ratio of two tooth counts. The best such fractions are the convergents of the continued fraction, which is how Huygens chose 206 and 7 teeth for Saturn in 1682:'),
         h('ul.convergents', null, conv.map((c) => h('li', null, `${c.p}/${c.q}: ${errorText(c.error / wanted)}`))),
-        h('p', null, `With no wheel over ${Math.max(this.limits.maxTeeth, 20)} teeth, the best single pair is ${single.p}/${single.q}, ${errorText(single.error / wanted)}. Two pairs multiply, and reach ratios whose tooth counts would otherwise be far too large to cut.`)));
+        h('p', null, single
+          ? `With no wheel over ${Math.max(this.limits.maxTeeth, 20)} teeth, the best single pair is ${single.p}/${single.q}, ${errorText(single.error / wanted)}. Two pairs multiply, and reach ratios whose tooth counts would otherwise be far too large to cut.`
+          : `With no wheel under 8 teeth or over ${Math.max(this.limits.maxTeeth, 20)}, no single pair can make this ratio at all. Two pairs multiply, and reach it easily.`)));
     }
     return box;
   }
@@ -287,7 +289,7 @@ export class WorkbenchPanel implements Panel {
 function buildLayoutFaults(spec: Parameters<typeof cloneSpec>[0], id: TrainId, step: Step): string[] {
   const test = cloneSpec(spec);
   setTrain(test, id, step);
-  return buildLayout(test, PHYSICAL_LIMITS).rules.filter((r) => !r.ok && r.train === id && !r.id.endsWith('.unit')).map((r) => r.text);
+  return buildLayout(test, PHYSICAL_LIMITS).rules.filter((r) => !r.ok && !r.advice && r.train === id).map((r) => r.text);
 }
 
 function cap(s: string): string {
