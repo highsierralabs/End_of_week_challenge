@@ -42,6 +42,20 @@
       "clipAlt": "A still life of a glass ball, a wine glass and a gold knot settles from noise; the ball is dragged across the table and the camera orbits",
       "tech": ["WebGL2", "Spectral path tracing", "Photon mapping", "TypeScript"],
       "tag": "lightbox-v1.0.0"
+    },
+    {
+      "slug": "wheelwork",
+      "dir": "Wheelwork",
+      "title": "Wheelwork",
+      "tagline": "A clockwork orrery you can count, change and print",
+      "summary": "A brass orrery that exists as its own tooth counts: Mercury to Saturn, and a Moon with phases, a tilted orbit and eclipse seasons. Turn the crank, open the case, change any wheel and see what a century does to it against the real sky. The solver finds better trains, and the same solids download as a 3D-print kit. A thirteen-stop tour and a validation page of 58 checks against JPL and NASA data come with it.",
+      "date": "2026-11-27",
+      "image": "Wheelwork/docs/screenshots/card.jpg",
+      "imageAlt": "A brass orrery with its walnut case open: a tower of spoked gear wheels under an engraved plate, the planets on stalks above",
+      "clip": "Wheelwork/docs/screenshots/orrery.gif",
+      "clipAlt": "The orrery runs, its case parts to show the gear train turning, and the view closes in on the Earth and Moon",
+      "tech": ["three.js", "Involute gears", "Gear-train solver", "TypeScript"],
+      "tag": "wheelwork-v1.0.0"
     }
   ]
 }

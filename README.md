@@ -61,6 +61,18 @@ Before the first run, know that:
 
 ## The builds
 
+### 4. [Wheelwork](Wheelwork/): a clockwork orrery you can count, change and print (27 November 2026)
+
+![The orrery running: the case opens on the wheelwork, then the view closes in on the Earth and Moon](Wheelwork/docs/screenshots/orrery.gif)
+
+A brass orrery that exists as its own tooth counts: Mercury to Saturn round the Sun, and a Moon with phases, a tilted
+orbit and eclipse seasons. Every motion is an exact product of tooth counts; the app draws the 38 wheels as true
+involute gears, turns them, and measures the machine against the real sky. A workbench changes any wheel and a solver
+finds better trains; the same solids download as a 3D-print kit. A thirteen-stop tour and a validation page of 58
+checks against JPL and NASA data come with it.
+
+**Live:** https://highsierralabs.github.io/End_of_week_challenge/wheelwork/ · [Read more](Wheelwork/README.md)
+
 ### 3. [Lightbox](Lightbox/): a spectral path tracer you can rearrange (27 November 2026)
 
 ![The studio: a still life settles from noise, a glass ball is dragged across the table and its caustic follows, then the camera orbits](Lightbox/docs/screenshots/studio.gif)
